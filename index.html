@@ -569,7 +569,9 @@ function renderItems() {
   const el = document.getElementById('items-list');
   const items = myItems();
   if (!items.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p>
+      <button onclick="debugFirestore()" style="margin-top:12px;padding:8px 16px;background:#0F766E;color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px">🔍 データ確認</button>
+    </div>`;
     return;
   }
   el.innerHTML = items.map(item => {
@@ -1312,6 +1314,17 @@ function resetMeasureForm(){
 }
 
 /* ===== TOAST ===== */
+function debugFirestore() {
+  Promise.all([
+    db.collection('inventory').where('assignee','==','相川').get(),
+    db.collection('inventory').where('assignee','==','B').get(),
+    db.collection('inventory').where('assignee','==','奥村').get(),
+    db.collection('inventory').where('assignee','==','A').get(),
+  ]).then(([r1,r2,r3,r4]) => {
+    alert(`Firestoreの実データ:\n相川: ${r1.size}件\nB(旧): ${r2.size}件\n奥村: ${r3.size}件\nA(旧): ${r4.size}件`);
+  }).catch(e => alert('エラー: ' + e.message));
+}
+
 function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('on');
