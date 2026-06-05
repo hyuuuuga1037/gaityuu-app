@@ -229,13 +229,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="login-card">
     <div class="login-icon">👔</div>
     <div class="login-title">外注アシスタント</div>
-    <div class="login-sub">担当者を選んでログインしてください</div>
-    <div class="login-btns">
-      <button class="login-btn login-btn-primary" onclick="loginAs('奥村')">奥村さんとしてログイン</button>
-      <div class="login-divider">または</div>
-      <button class="login-btn login-btn-outline" onclick="loginAs('相川')">相川さんとしてログイン</button>
+    <div class="login-sub">パスワードを入力してログインしてください</div>
+    <div class="fg" style="margin-bottom:12px">
+      <input type="password" id="login-pw-input" placeholder="パスワードを入力"
+        onkeydown="if(event.key==='Enter')confirmLogin()">
     </div>
-    <div class="admin-link" onclick="openAdminLogin()">🔒 管理者としてログイン</div>
+    <p id="login-pw-err" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none">パスワードが違います</p>
+    <button class="login-btn login-btn-primary" onclick="confirmLogin()">ログイン</button>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200)">
+      <div class="admin-link" onclick="openAdminLogin()">🔒 管理者画面はこちら</div>
+    </div>
   </div>
 </div>
 
@@ -244,7 +247,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="login-card" style="box-shadow:none">
     <div class="login-icon">🔒</div>
     <div class="login-title">管理者ログイン</div>
-    <div class="login-sub">パスワードを入力してください</div>
+    <div class="login-sub">管理者パスワードを入力してください</div>
     <div class="fg">
       <input type="password" id="admin-pw-input" placeholder="パスワード（数字4桁）"
         onkeydown="if(event.key==='Enter')confirmAdminLogin()">
@@ -418,10 +421,23 @@ if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
 const db = firebase.firestore();
 
 /* ===== AUTH ===== */
-const ADMIN_PW = '0525';
+const ADMIN_PW   = '0525';
+const WORKER_PW  = { '1234': '奥村', '5678': '相川' };
 let currentUser = null;
 
-function loginAs(user) { currentUser = user; startApp(); }
+function confirmLogin() {
+  const pw = document.getElementById('login-pw-input').value;
+  const user = WORKER_PW[pw];
+  if (!user) {
+    document.getElementById('login-pw-err').style.display = 'block';
+    document.getElementById('login-pw-input').value = '';
+    return;
+  }
+  document.getElementById('login-pw-err').style.display = 'none';
+  document.getElementById('login-pw-input').value = '';
+  currentUser = user;
+  startApp();
+}
 
 function openAdminLogin() {
   document.getElementById('admin-pw-input').value = '';
@@ -462,13 +478,14 @@ function startApp() {
 
   const workerPanels = ['items','measure','summary'];
   const adminPanels  = ['admin-items','admin-summary','admin-settings'];
+  // インラインスタイルをリセットしてCSSクラスで制御
   workerPanels.forEach(id => {
     const p = document.getElementById('panel-'+id);
-    if (p) p.style.display = isAdmin ? 'none' : 'block';
+    if (p) { p.style.display = ''; p.classList.remove('on'); }
   });
   adminPanels.forEach(id => {
     const p = document.getElementById('panel-'+id);
-    if (p) p.style.display = isAdmin ? 'block' : 'none';
+    if (p) { p.style.display = ''; p.classList.remove('on'); }
   });
 
   currentTab = isAdmin ? 'admin-items' : 'items';
@@ -520,11 +537,8 @@ function defaultRates() {
 /* ===== TABS ===== */
 function switchTab(id) {
   currentTab = id;
-  const isAdmin = currentUser === 'admin';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
-  document.querySelectorAll('.panel').forEach(p => {
-    if (p.style.display !== 'none') p.classList.toggle('on', p.id === 'panel-'+id);
-  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'panel-'+id));
   renderCurrentTab();
 }
 function renderCurrentTab() {
