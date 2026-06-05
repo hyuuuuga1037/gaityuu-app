@@ -564,8 +564,9 @@ function myItems() {
 function renderItems() {
   const el = document.getElementById('items-list');
   const items = myItems();
+  const debugInfo = `全在庫:${_inventory.length}件 / 自分(${myAssigneeKey()})担当:${_inventory.filter(i=>i.assignee===myAssigneeKey()).length}件 / 未売却:${items.length}件`;
   if (!items.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p><p style="font-size:11px;color:var(--gray-400);margin-top:8px">${debugInfo}</p></div>`;
     return;
   }
   el.innerHTML = items.map(item => {
