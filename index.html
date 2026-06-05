@@ -529,8 +529,8 @@ function defaultRates() {
   const shoot = {};
   genres.forEach(g => shoot[g] = g === 'スーツ' ? 200 : g === 'アクセサリー' ? 100 : 150);
   return {
-    奥村: { shoot: {...shoot}, pack: 100 },
-    相川: { shoot: {...shoot}, pack: 100 }
+    奥村: { shoot: {...shoot}, pack: 100, spaceEnabled: true,  spaceAmount: 0 },
+    相川: { shoot: {...shoot}, pack: 100, spaceEnabled: false, spaceAmount: 0 }
   };
 }
 
@@ -576,13 +576,13 @@ function renderItems() {
     return `
     <div class="item-card">
       <div class="item-top">
-        <div>
-          <div class="item-no">No.${item.no||'-'}</div>
-          <div class="item-brand">${item.brand||'-'}</div>
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:1px;margin-bottom:2px">No.${item.no||'-'}</div>
+          <div style="font-size:14px;font-weight:700">${item.brand||'-'}${item.details?' / '+item.details:''}</div>
         </div>
         <span class="badge ${stClass}">${stLabel}</span>
       </div>
-      <div class="item-meta">${item.genre||''}${item.details?' / '+item.details:''}${item.size?'　'+item.size:''}</div>
+      <div class="item-meta" style="margin-top:4px">${item.genre||''}${item.size?'　サイズ：'+item.size:''}</div>
       <div class="item-checks">
         <label class="check-row" onclick="toggleWork(event,${item.id},'shoot',${hasShoot})">
           <input type="checkbox" ${hasShoot?'checked':''} readonly>
@@ -689,19 +689,26 @@ function renderSummary() {
     el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><p>作業記録がありません</p></div>`;
     return;
   }
+  const rates = _rates || defaultRates();
+  const userRates = rates[currentUser] || {};
+  const spaceEnabled = userRates.spaceEnabled || false;
+  const spaceAmount  = userRates.spaceAmount  || 0;
+
   el.innerHTML = months.map(month => {
     const recs = byMonth[month];
     const shootRecs = recs.filter(r => r.type==='shoot');
     const packRecs  = recs.filter(r => r.type==='pack');
     const shootTotal = shootRecs.reduce((s,r) => s+(r.unitPrice||0), 0);
     const packTotal  = packRecs.reduce((s,r)  => s+(r.unitPrice||0), 0);
+    const grandTotal = shootTotal + packTotal + (spaceEnabled ? spaceAmount : 0);
     const [y,m] = month.split('-');
     return `
     <div class="month-card">
       <div class="month-title">${y}年${parseInt(m)}月</div>
       <div class="month-row"><span>📷 撮影採寸（${shootRecs.length}件）</span><span>¥${shootTotal.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${packRecs.length}件）</span><span>¥${packTotal.toLocaleString()}</span></div>
-      <div class="month-row total"><span>合計</span><span>¥${(shootTotal+packTotal).toLocaleString()}</span></div>
+      ${spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${spaceAmount.toLocaleString()}</span></div>` : ''}
+      <div class="month-row total"><span>合計</span><span>¥${grandTotal.toLocaleString()}</span></div>
     </div>`;
   }).join('');
 }
@@ -810,6 +817,22 @@ function renderAdminSettings() {
           </div>
         </div>
       </div>
+      <div class="admin-section">
+        <div class="admin-section-title">🏠 場所代（月額）</div>
+        <div class="rate-row">
+          <span>有効にする</span>
+          <input type="checkbox" id="rate-${person}-space-enabled"
+            ${rates[person]?.spaceEnabled?'checked':''}
+            style="width:20px;height:20px;accent-color:var(--primary);cursor:pointer">
+        </div>
+        <div class="rate-row">
+          <span>月額金額</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:13px;color:var(--gray-400)">¥</span>
+            <input type="number" id="rate-${person}-space-amount" value="${rates[person]?.spaceAmount??0}" min="0" step="100">
+          </div>
+        </div>
+      </div>
     </div>`).join('') +
     `<button class="btn btn-primary btn-full" onclick="saveRates()">💾 単価を保存する</button>`;
 }
@@ -823,6 +846,8 @@ async function saveRates() {
       newRates[person].shoot[g] = parseInt(document.getElementById(`rate-${person}-shoot-${g}`)?.value)||0;
     });
     newRates[person].pack = parseInt(document.getElementById(`rate-${person}-pack`)?.value)||0;
+    newRates[person].spaceEnabled = document.getElementById(`rate-${person}-space-enabled`)?.checked || false;
+    newRates[person].spaceAmount  = parseInt(document.getElementById(`rate-${person}-space-amount`)?.value)||0;
   });
   try {
     await db.collection('settings').doc('rates').set(newRates);
