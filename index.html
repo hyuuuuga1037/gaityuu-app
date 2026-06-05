@@ -510,8 +510,22 @@ let _selectedItemId = null; // 採寸タブで選択中の商品ID
 
 /* ===== DATA ===== */
 function initData() {
+  // 在庫管理アプリと同じドメインのLocalStorageから直接読み込む（最速・確実）
+  function loadFromLocal() {
+    const raw = localStorage.getItem('apparel_items');
+    if (raw) {
+      _inventory = JSON.parse(raw);
+      renderCurrentTab();
+    }
+  }
+  loadFromLocal();
+  // Firestoreからも読み込み（他デバイス用）
   db.collection('inventory').onSnapshot(snap => {
-    _inventory = snap.docs.map(d => d.data());
+    const fsData = snap.docs.map(d => d.data());
+    // LocalStorageのデータが多い場合はそちらを優先
+    const localRaw = localStorage.getItem('apparel_items');
+    const localData = localRaw ? JSON.parse(localRaw) : [];
+    _inventory = localData.length >= fsData.length ? localData : fsData;
     renderCurrentTab();
   });
   db.collection('work_records').orderBy('date','desc').onSnapshot(snap => {
