@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>外注アシスタント</title>
+<meta name="theme-color" content="#0F766E">
+<style>
+:root {
+  --primary:#0F766E; --primary-light:#CCFBF1; --primary-dark:#0D5C57;
+  --red:#E8503A; --red-light:#FDECEA;
+  --danger:#EF4444; --danger-light:#FEE2E2;
+  --success:#10B981; --success-light:#D1FAE5;
+  --warning:#F59E0B; --warning-light:#FEF3C7;
+  --gray-50:#F9FAFB; --gray-100:#F3F4F6; --gray-200:#E5E7EB;
+  --gray-300:#D1D5DB; --gray-400:#9CA3AF; --gray-500:#6B7280;
+  --gray-600:#4B5563; --gray-700:#374151; --gray-800:#1F2937; --gray-900:#111827;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','YuGothicUI',sans-serif;
+  background:var(--gray-50);color:var(--gray-800);min-height:100vh;font-size:14px}
+
+/* ── LOGIN ── */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{background:white;border-radius:16px;padding:32px 24px;width:100%;max-width:360px;
+  box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center}
+.login-icon{font-size:48px;margin-bottom:12px}
+.login-title{font-size:20px;font-weight:700;color:var(--primary);margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--gray-400);margin-bottom:24px}
+.login-btns{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.login-btn{padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;
+  border:2px solid var(--primary);transition:.15s;font-family:inherit}
+.login-btn-primary{background:var(--primary);color:white}
+.login-btn-outline{background:white;color:var(--primary)}
+.login-divider{font-size:12px;color:var(--gray-400);margin:4px 0}
+.admin-link{font-size:12px;color:var(--gray-400);cursor:pointer;text-decoration:underline}
+#admin-pw-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:500;align-items:center;justify-content:center;padding:24px}
+#admin-pw-overlay.open{display:flex}
+
+/* ── HEADER ── */
+#app{display:none}
+#app.open{display:block}
+.hdr{background:var(--primary);color:white;padding:12px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200}
+.hdr-title{font-size:16px;font-weight:700}
+.hdr-user{font-size:11px;opacity:.8;margin-top:1px}
+.hdr-logout{font-size:12px;background:rgba(255,255,255,.2);border:none;
+  color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit}
+
+/* ── TABS ── */
+.tabs{display:flex;background:white;border-bottom:1px solid var(--gray-200);
+  position:sticky;top:54px;z-index:199;overflow-x:auto}
+.tab{flex:1;min-width:60px;padding:11px 6px;text-align:center;font-size:12px;font-weight:500;
+  color:var(--gray-400);cursor:pointer;border-bottom:2.5px solid transparent;
+  transition:.15s;white-space:nowrap}
+.tab.on{color:var(--primary);border-color:var(--primary);font-weight:700}
+.panel{display:none;padding:12px 16px;max-width:640px;margin:0 auto;padding-bottom:48px}
+.panel.on{display:block}
+
+/* ── CARDS ── */
+.card{background:white;border-radius:12px;border:1px solid var(--gray-200);padding:16px;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:700;color:var(--gray-400);
+  letter-spacing:.05em;text-transform:uppercase;margin-bottom:12px}
+
+/* ── ITEM CARD ── */
+.item-card{background:white;border-radius:12px;border:1px solid var(--gray-200);
+  padding:14px;margin-bottom:10px}
+.item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.item-no{font-size:11px;color:var(--gray-400);font-weight:600}
+.item-brand{font-size:15px;font-weight:700}
+.item-meta{font-size:12px;color:var(--gray-500);margin-bottom:10px}
+.item-checks{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.check-row{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.check-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);cursor:pointer}
+.check-label{font-size:13px;font-weight:500}
+.check-label.done{color:var(--primary);font-weight:700}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;
+  border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-unlisted{background:var(--gray-100);color:var(--gray-600)}
+.badge-listed{background:var(--warning-light);color:#92400E}
+.badge-sold{background:var(--success-light);color:#065F46}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;
+  border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+  border:none;transition:.15s;font-family:inherit}
+.btn:active{opacity:.8}
+.btn-primary{background:var(--primary);color:white}
+.btn-red{background:var(--red);color:white}
+.btn-outline{background:white;color:var(--gray-600);border:1.5px solid var(--gray-300)}
+.btn-outline-primary{background:white;color:var(--primary);border:1.5px solid var(--primary)}
+.btn-sm{padding:6px 10px;font-size:12px}
+.btn-full{width:100%;justify-content:center;padding:13px;font-size:14px}
+
+/* ── FORM (出品アシスタント系) ── */
+.sec-ttl{font-size:12px;font-weight:700;color:var(--gray-400);
+  letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+.fg{margin-bottom:14px}
+.fl{font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.opt{font-size:10px;background:#EFEFEF;color:#888;padding:1px 6px;border-radius:4px;font-weight:400}
+.fc{font-size:11px;color:var(--gray-400);margin-left:auto}
+input[type=text],input[type=number],textarea,select{
+  width:100%;padding:10px 12px;border:1.5px solid var(--gray-200);
+  border-radius:9px;font-size:14px;background:#FAFAFA;color:var(--gray-800);
+  outline:none;transition:border-color .15s;-webkit-appearance:none;font-family:inherit}
+input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{
+  border-color:var(--primary);background:white}
+textarea{resize:vertical;min-height:80px;line-height:1.6}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+/* ── CATEGORY GRID ── */
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cat-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:10px 6px;border:1.5px solid var(--gray-200);border-radius:12px;
+  background:white;cursor:pointer;gap:4px;min-height:72px;transition:.15s;user-select:none}
+.cat-btn:active{transform:scale(.96)}
+.cat-btn.on{background:var(--red-light);border-color:var(--red)}
+.cat-btn .ci{font-size:28px;line-height:1}
+.cat-btn .cl{font-size:12px;font-weight:600;color:var(--gray-800)}
+.cat-btn.on .cl{color:var(--red)}
+
+/* ── MEASURE ROW ── */
+.mr{display:flex;align-items:center;margin-bottom:10px;gap:8px}
+.ml{width:88px;flex-shrink:0;font-size:13px;font-weight:500;line-height:1.3}
+.ml small{display:block;font-size:10px;color:var(--gray-400)}
+.mw{flex:1;display:flex;align-items:center;gap:5px}
+.mw input{flex:1;text-align:right;padding-right:8px}
+.mu{font-size:13px;color:var(--gray-400);width:22px;flex-shrink:0}
+
+/* ── RADIO GROUP ── */
+.rg{display:flex;gap:7px;flex-wrap:wrap}
+.rb{flex:1;min-width:70px;padding:9px 10px;border:1.5px solid var(--gray-200);
+  border-radius:9px;text-align:center;cursor:pointer;font-size:13px;
+  transition:.15s;background:white;font-weight:500;user-select:none}
+.rb:active{transform:scale(.97)}
+.rb.on{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:700}
+
+/* ── SUIT SUB-SECTION ── */
+.suit-sec{border:1.5px solid #F0D0CC;border-radius:12px;padding:14px;margin-bottom:12px;background:#FFFBFA}
+.suit-sec-ttl{font-size:13px;font-weight:800;color:var(--red);
+  margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid #F0D0CC;display:flex;align-items:center;gap:6px}
+
+/* ── CONDITION ── */
+.cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cond{padding:9px 10px;border:1.5px solid var(--gray-200);border-radius:9px;cursor:pointer;transition:.15s;user-select:none}
+.cond.on{border-color:var(--red);background:var(--red-light)}
+.cond-name{font-size:13px;font-weight:700}
+.cond.on .cond-name{color:var(--red)}
+.cond-desc{font-size:10px;color:var(--gray-400);margin-top:2px}
+
+/* ── SHIPPING ── */
+.ship{border:1.5px solid var(--gray-200);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.15s;user-select:none}
+.ship.on{border-color:var(--red);background:var(--red-light)}
+.ship-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
+.ship-tags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.ship-tag{font-size:10px;background:#EFEFEF;padding:2px 7px;border-radius:4px;color:#666}
+.ship.on .ship-tag{background:#F9C9C2;color:#B03020}
+
+/* ── PRICE ── */
+.price-wrap{position:relative}
+.price-pre{position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  font-size:15px;color:var(--gray-400);pointer-events:none}
+.price-wrap input{padding-left:26px}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:300;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:18px 18px 0 0;width:100%;max-width:640px;
+  max-height:90vh;overflow-y:auto;padding:20px 16px 32px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-size:16px;font-weight:700}
+.modal-close{background:var(--gray-100);border:none;border-radius:8px;
+  width:32px;height:32px;cursor:pointer;font-size:16px}
+.preview{background:#F8F8F8;border:1.5px solid var(--gray-200);border-radius:10px;
+  padding:14px;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;
+  max-height:320px;overflow-y:auto;font-family:'Hiragino Sans',monospace}
+.copy-ok{display:none;text-align:center;color:#2E7D32;font-size:13px;font-weight:700;margin-top:8px}
+
+/* ── MONTH SUMMARY ── */
+.month-card{background:var(--primary-light);border-radius:12px;padding:16px;margin-bottom:12px}
+.month-title{font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:10px}
+.month-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
+.month-row.total{border-top:1px solid var(--primary);margin-top:6px;padding-top:8px;font-weight:700;font-size:15px}
+
+/* ── ADMIN ── */
+.admin-section{margin-bottom:20px}
+.admin-section-title{font-size:12px;font-weight:700;color:var(--gray-400);
+  letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;
+  padding-bottom:6px;border-bottom:1px solid var(--gray-200)}
+.rate-row{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:var(--gray-50);border-radius:8px;margin-bottom:6px;font-size:13px}
+.rate-row input{width:90px;padding:6px 10px;border:1.5px solid var(--gray-200);
+  border-radius:6px;font-size:13px;text-align:right;font-family:inherit;outline:none}
+.rate-row input:focus{border-color:var(--primary)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--gray-900);color:white;padding:11px 22px;border-radius:10px;
+  font-size:13px;z-index:999;transition:.3s;white-space:nowrap;pointer-events:none}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:40px 20px;color:var(--gray-400)}
+.empty-icon{font-size:40px;margin-bottom:10px}
+
+/* ── NOTICE ── */
+.notice{background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;
+  padding:10px 12px;font-size:12px;color:#6D4C41;line-height:1.6;margin-bottom:12px}
+
+/* ── SELECTED ITEM BANNER ── */
+.selected-banner{background:var(--primary);color:white;border-radius:10px;
+  padding:10px 14px;margin-bottom:12px;font-size:13px;display:flex;
+  align-items:center;justify-content:space-between}
+.selected-banner .banner-info{font-weight:700}
+.selected-banner .banner-clear{background:rgba(255,255,255,.25);border:none;color:white;
+  padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">👔</div>
+    <div class="login-title">外注アシスタント</div>
+    <div class="login-sub">担当者を選んでログインしてください</div>
+    <div class="login-btns">
+      <button class="login-btn login-btn-primary" onclick="loginAs('奥村')">奥村さんとしてログイン</button>
+      <div class="login-divider">または</div>
+      <button class="login-btn login-btn-outline" onclick="loginAs('相川')">相川さんとしてログイン</button>
+    </div>
+    <div class="admin-link" onclick="openAdminLogin()">🔒 管理者としてログイン</div>
+  </div>
+</div>
+
+<!-- ===== 管理者PWオーバーレイ ===== -->
+<div id="admin-pw-overlay" onclick="closeAdminLogin(event)">
+  <div class="login-card" style="box-shadow:none">
+    <div class="login-icon">🔒</div>
+    <div class="login-title">管理者ログイン</div>
+    <div class="login-sub">パスワードを入力してください</div>
+    <div class="fg">
+      <input type="password" id="admin-pw-input" placeholder="パスワード（数字4桁）"
+        onkeydown="if(event.key==='Enter')confirmAdminLogin()">
+    </div>
+    <p id="admin-pw-err" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none">パスワードが違います</p>
+    <button class="btn btn-primary btn-full" onclick="confirmAdminLogin()">ログイン</button>
+  </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app">
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">外注アシスタント</div>
+      <div class="hdr-user" id="hdr-user"></div>
+    </div>
+    <button class="hdr-logout" onclick="logout()">ログアウト</button>
+  </div>
+
+  <!-- 外注さん用タブ -->
+  <div class="tabs" id="worker-tabs">
+    <div class="tab on" data-tab="items" onclick="switchTab('items')">📦 担当商品</div>
+    <div class="tab" data-tab="measure" onclick="switchTab('measure')">📋 採寸・説明文</div>
+    <div class="tab" data-tab="summary" onclick="switchTab('summary')">💰 月次集計</div>
+  </div>
+  <!-- 管理者用タブ -->
+  <div class="tabs" id="admin-tabs" style="display:none">
+    <div class="tab on" data-tab="admin-items" onclick="switchTab('admin-items')">📦 全商品</div>
+    <div class="tab" data-tab="admin-summary" onclick="switchTab('admin-summary')">💰 外注費集計</div>
+    <div class="tab" data-tab="admin-settings" onclick="switchTab('admin-settings')">⚙️ 単価設定</div>
+  </div>
+
+  <!-- 📦 担当商品 -->
+  <div class="panel on" id="panel-items">
+    <div id="items-list"></div>
+  </div>
+
+  <!-- 📋 採寸・説明文 -->
+  <div class="panel" id="panel-measure">
+    <div id="selected-item-banner"></div>
+    <!-- カテゴリ -->
+    <div class="card">
+      <div class="sec-ttl">カテゴリ</div>
+      <div class="cat-grid" id="cat-grid"></div>
+    </div>
+    <!-- 基本情報 -->
+    <div class="card">
+      <div class="sec-ttl">基本情報</div>
+      <div class="fg">
+        <div class="fl">管理番号 <span class="opt">任意</span></div>
+        <input type="text" id="f-mgmt" placeholder="例：2024-001">
+      </div>
+      <div class="fg">
+        <div class="fl">商品名 <span class="fc" id="name-cnt">0/40</span></div>
+        <input type="text" id="f-name" placeholder="例：スーツ セットアップ" maxlength="40"
+          oninput="document.getElementById('name-cnt').textContent=this.value.length+'/40'">
+      </div>
+      <div class="fg">
+        <div class="fl">ブランド名 <span class="opt">任意</span></div>
+        <input type="text" id="f-brand" placeholder="例：SUITS SELECT、青山、AOKI">
+      </div>
+      <div class="fg">
+        <div class="fl">表記サイズ <span class="opt">任意</span></div>
+        <input type="text" id="f-size" placeholder="例：M、L、XL、38、170/88A">
+      </div>
+      <div class="fg">
+        <div class="fl">商品の状態</div>
+        <div class="cond-grid" id="cond-grid"></div>
+      </div>
+    </div>
+    <!-- 採寸データ -->
+    <div class="card">
+      <div class="sec-ttl">採寸データ</div>
+      <div id="measure-area">
+        <div style="color:var(--gray-400);text-align:center;padding:20px;font-size:13px">
+          ↑ カテゴリを選択すると採寸項目が表示されます
+        </div>
+      </div>
+    </div>
+    <!-- アピール -->
+    <div class="card">
+      <div class="sec-ttl">アピールポイント・状態</div>
+      <div class="fg">
+        <div class="fl">詳細 <span class="opt">任意</span></div>
+        <textarea id="f-appeal" rows="4" placeholder="例：クリーニング済み。目立った傷・汚れなし。"></textarea>
+      </div>
+      <div class="fg">
+        <div class="fl">ハッシュタグ <span class="opt">任意</span></div>
+        <input type="text" id="f-tags" placeholder="例：#スーツ #セットアップ">
+      </div>
+    </div>
+    <!-- 配送・価格 -->
+    <div class="card">
+      <div class="sec-ttl">配送方法 <span class="opt">任意</span></div>
+      <div id="ship-list"></div>
+    </div>
+    <div class="card">
+      <div class="sec-ttl">販売価格 <span class="opt">任意</span></div>
+      <div class="price-wrap">
+        <span class="price-pre">¥</span>
+        <input type="number" id="f-price" placeholder="3000" min="300">
+      </div>
+    </div>
+    <!-- ボタン -->
+    <button class="btn btn-red btn-full" onclick="generateText()" style="margin-bottom:8px">📋 説明文を生成・コピー</button>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-outline-primary btn-full" onclick="saveDraft()">💾 下書きを保存</button>
+      <button class="btn btn-outline btn-full" onclick="resetMeasureForm()">🔄 リセット</button>
+    </div>
+  </div>
+
+  <!-- 💰 月次集計 -->
+  <div class="panel" id="panel-summary">
+    <div id="summary-content"></div>
+  </div>
+
+  <!-- 管理者：全商品 -->
+  <div class="panel" id="panel-admin-items" style="display:none">
+    <div class="fg">
+      <select id="admin-filter-assignee" onchange="renderAdminItems()">
+        <option value="">全担当者</option>
+        <option value="奥村">奥村さん</option>
+        <option value="相川">相川さん</option>
+      </select>
+    </div>
+    <div id="admin-items-list"></div>
+  </div>
+
+  <!-- 管理者：外注費集計 -->
+  <div class="panel" id="panel-admin-summary" style="display:none">
+    <div id="admin-summary-content"></div>
+  </div>
+
+  <!-- 管理者：単価設定 -->
+  <div class="panel" id="panel-admin-settings" style="display:none">
+    <div id="admin-settings-content"></div>
+  </div>
+</div>
+
+<!-- 説明文プレビューモーダル -->
+<div class="modal-overlay" id="gen-overlay" onclick="closeGenModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">生成された説明文</div>
+      <button class="modal-close" onclick="closeGenModal()">✕</button>
+    </div>
+    <div class="preview" id="gen-preview"></div>
+    <div class="copy-ok" id="copy-ok">✅ コピーしました！</div>
+    <button class="btn btn-red btn-full" style="margin-top:14px" onclick="copyGenText()">📋 クリップボードにコピー</button>
+    <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="closeGenModal()">閉じる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+'use strict';
+
+/* ===== FIREBASE ===== */
+const FB_CFG = {
+  apiKey:"AIzaSyDCK9lsBJsc-UxzxcfxMPdJS94V1gZb2k8",
+  authDomain:"hs-tools-86dab.firebaseapp.com",
+  projectId:"hs-tools-86dab",
+  storageBucket:"hs-tools-86dab.firebasestorage.app",
+  messagingSenderId:"755265926130",
+  appId:"1:755265926130:web:257584deb277fc7ce3716b"
+};
+if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+const db = firebase.firestore();
+
+/* ===== AUTH ===== */
+const ADMIN_PW = '0525';
+let currentUser = null;
+
+function loginAs(user) { currentUser = user; startApp(); }
+
+function openAdminLogin() {
+  document.getElementById('admin-pw-input').value = '';
+  document.getElementById('admin-pw-err').style.display = 'none';
+  document.getElementById('admin-pw-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('admin-pw-input').focus(), 200);
+}
+function closeAdminLogin(e) {
+  if (!e || e.target === document.getElementById('admin-pw-overlay'))
+    document.getElementById('admin-pw-overlay').classList.remove('open');
+}
+function confirmAdminLogin() {
+  if (document.getElementById('admin-pw-input').value !== ADMIN_PW) {
+    document.getElementById('admin-pw-err').style.display = 'block';
+    document.getElementById('admin-pw-input').value = '';
+    return;
+  }
+  document.getElementById('admin-pw-overlay').classList.remove('open');
+  currentUser = 'admin';
+  startApp();
+}
+function logout() {
+  currentUser = null;
+  _selectedItemId = null;
+  document.getElementById('app').classList.remove('open');
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function startApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('open');
+  document.getElementById('hdr-user').textContent =
+    currentUser === 'admin' ? '管理者モード' : currentUser + 'さん';
+
+  const isAdmin = currentUser === 'admin';
+  document.getElementById('worker-tabs').style.display = isAdmin ? 'none' : 'flex';
+  document.getElementById('admin-tabs').style.display  = isAdmin ? 'flex' : 'none';
+
+  const workerPanels = ['items','measure','summary'];
+  const adminPanels  = ['admin-items','admin-summary','admin-settings'];
+  workerPanels.forEach(id => {
+    const p = document.getElementById('panel-'+id);
+    if (p) p.style.display = isAdmin ? 'none' : 'block';
+  });
+  adminPanels.forEach(id => {
+    const p = document.getElementById('panel-'+id);
+    if (p) p.style.display = isAdmin ? 'block' : 'none';
+  });
+
+  currentTab = isAdmin ? 'admin-items' : 'items';
+  // タブのonクラスをリセット
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('on', t.dataset.tab === currentTab);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    if (p.style.display !== 'none') p.classList.toggle('on', p.id === 'panel-'+currentTab);
+  });
+
+  initData();
+  if (!isAdmin) initMeasureForm();
+}
+
+/* ===== STATE ===== */
+let currentTab = 'items';
+let _inventory = [];
+let _workRecords = [];
+let _rates = null;
+let _selectedItemId = null; // 採寸タブで選択中の商品ID
+
+/* ===== DATA ===== */
+function initData() {
+  db.collection('inventory').onSnapshot(snap => {
+    _inventory = snap.docs.map(d => d.data());
+    renderCurrentTab();
+  });
+  db.collection('work_records').orderBy('date','desc').onSnapshot(snap => {
+    _workRecords = snap.docs.map(d => ({ fsId: d.id, ...d.data() }));
+    renderCurrentTab();
+  });
+  db.collection('settings').doc('rates').onSnapshot(snap => {
+    _rates = snap.exists ? snap.data() : defaultRates();
+    renderCurrentTab();
+  });
+}
+
+function defaultRates() {
+  const genres = ['スーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const shoot = {};
+  genres.forEach(g => shoot[g] = g === 'スーツ' ? 200 : g === 'アクセサリー' ? 100 : 150);
+  return {
+    奥村: { shoot: {...shoot}, pack: 100 },
+    相川: { shoot: {...shoot}, pack: 100 }
+  };
+}
+
+/* ===== TABS ===== */
+function switchTab(id) {
+  currentTab = id;
+  const isAdmin = currentUser === 'admin';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
+  document.querySelectorAll('.panel').forEach(p => {
+    if (p.style.display !== 'none') p.classList.toggle('on', p.id === 'panel-'+id);
+  });
+  renderCurrentTab();
+}
+function renderCurrentTab() {
+  if (!currentUser) return;
+  switch(currentTab) {
+    case 'items':          renderItems(); break;
+    case 'measure':        renderSelectedBanner(); break;
+    case 'summary':        renderSummary(); break;
+    case 'admin-items':    renderAdminItems(); break;
+    case 'admin-summary':  renderAdminSummary(); break;
+    case 'admin-settings': renderAdminSettings(); break;
+  }
+}
+
+/* ===== 担当商品 ===== */
+function myAssigneeKey() { return currentUser === '奥村' ? 'A' : 'B'; }
+function myItems() {
+  return _inventory
+    .filter(i => i.assignee === myAssigneeKey() && i.status !== 'sold')
+    .sort((a,b) => (a.no||0) - (b.no||0));
+}
+
+function renderItems() {
+  const el = document.getElementById('items-list');
+  const items = myItems();
+  if (!items.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p></div>`;
+    return;
+  }
+  el.innerHTML = items.map(item => {
+    const hasShoot = _workRecords.some(r => r.itemId === item.id && r.type === 'shoot' && r.assignee === currentUser);
+    const hasPack  = _workRecords.some(r => r.itemId === item.id && r.type === 'pack'  && r.assignee === currentUser);
+    const stLabel  = {unlisted:'未出品', listed:'出品中'}[item.status||'unlisted'];
+    const stClass  = item.status === 'listed' ? 'badge-listed' : 'badge-unlisted';
+    return `
+    <div class="item-card">
+      <div class="item-top">
+        <div>
+          <div class="item-no">No.${item.no||'-'}</div>
+          <div class="item-brand">${item.brand||'-'}</div>
+        </div>
+        <span class="badge ${stClass}">${stLabel}</span>
+      </div>
+      <div class="item-meta">${item.genre||''}${item.details?' / '+item.details:''}${item.size?'　'+item.size:''}</div>
+      <div class="item-checks">
+        <label class="check-row" onclick="toggleWork(event,${item.id},'shoot',${hasShoot})">
+          <input type="checkbox" ${hasShoot?'checked':''} readonly>
+          <span class="check-label ${hasShoot?'done':''}">📷 撮影採寸</span>
+        </label>
+        <label class="check-row" onclick="toggleWork(event,${item.id},'pack',${hasPack})">
+          <input type="checkbox" ${hasPack?'checked':''} readonly>
+          <span class="check-label ${hasPack?'done':''}">📦 梱包発送</span>
+        </label>
+      </div>
+      <button class="btn btn-outline-primary btn-sm" onclick="openMeasureForItem(${item.id})">📋 採寸・説明文を入力</button>
+    </div>`;
+  }).join('');
+}
+
+async function toggleWork(e, itemId, type, isDone) {
+  e.preventDefault();
+  const item = _inventory.find(i => i.id === itemId);
+  if (!item) return;
+  const rates = _rates || defaultRates();
+  const userRates = rates[currentUser] || {};
+  const unitPrice = type === 'shoot'
+    ? (userRates.shoot?.[item.genre] || 150)
+    : (userRates.pack || 100);
+
+  if (isDone) {
+    // チェックを外す → 作業記録を削除
+    const record = _workRecords.find(r => r.itemId === itemId && r.type === type && r.assignee === currentUser);
+    if (!record) return;
+    if (!confirm('作業記録を取り消しますか？')) return;
+    try {
+      await db.collection('work_records').doc(record.fsId).delete();
+      showToast('🗑️ 作業記録を取り消しました');
+    } catch(err) { showToast('❌ 失敗しました'); }
+  } else {
+    // チェックを入れる → 作業記録を追加
+    const today = new Date().toISOString().slice(0,10);
+    const record = { itemId, type, date: today, unitPrice, assignee: currentUser, createdAt: new Date().toISOString() };
+    try {
+      await db.collection('work_records').add(record);
+      showToast('✅ 作業を記録しました');
+    } catch(err) { showToast('❌ 失敗しました'); }
+  }
+}
+
+/* ===== 採寸タブ ===== */
+function openMeasureForItem(itemId) {
+  _selectedItemId = itemId;
+  const item = _inventory.find(i => i.id === itemId);
+  if (!item) return;
+
+  // フォームに商品情報をセット
+  const mgmtEl = document.getElementById('f-mgmt');
+  const brandEl = document.getElementById('f-brand');
+  const sizeEl  = document.getElementById('f-size');
+  if (mgmtEl) mgmtEl.value = item.no || '';
+  if (brandEl) brandEl.value = item.brand || '';
+  if (sizeEl)  sizeEl.value  = item.size  || '';
+  const nameEl = document.getElementById('f-name');
+  if (nameEl) { nameEl.value = item.brand||''; document.getElementById('name-cnt').textContent=(item.brand||'').length+'/40'; }
+
+  // ジャンル→カテゴリ自動選択
+  const genreMap = { 'スーツ':'suit','靴':'shoes','バッグ':'bag','ジャージ':'jersey','洋服':'tops','デニム':'pants','その他':'tops' };
+  const catId = genreMap[item.genre] || '';
+  if (catId) selectCat(catId);
+
+  _currentDraftId = null; // 新規下書きとして扱う
+  renderSelectedBanner();
+  switchTab('measure');
+  window.scrollTo(0, 0);
+}
+
+function renderSelectedBanner() {
+  const el = document.getElementById('selected-item-banner');
+  if (!el) return;
+  if (!_selectedItemId) { el.innerHTML = ''; return; }
+  const item = _inventory.find(i => i.id === _selectedItemId);
+  if (!item) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="selected-banner">
+      <div class="banner-info">No.${item.no} ${item.brand||'-'} ${item.genre||''}</div>
+      <button class="banner-clear" onclick="clearSelectedItem()">✕ 解除</button>
+    </div>`;
+}
+
+function clearSelectedItem() {
+  _selectedItemId = null;
+  renderSelectedBanner();
+  resetMeasureForm();
+}
+
+/* ===== 月次集計 ===== */
+function renderSummary() {
+  const el = document.getElementById('summary-content');
+  const myRecords = _workRecords.filter(r => r.assignee === currentUser);
+  const byMonth = {};
+  myRecords.forEach(r => {
+    const m = r.date.slice(0,7);
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(r);
+  });
+  const months = Object.keys(byMonth).sort().reverse();
+  if (!months.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><p>作業記録がありません</p></div>`;
+    return;
+  }
+  el.innerHTML = months.map(month => {
+    const recs = byMonth[month];
+    const shootRecs = recs.filter(r => r.type==='shoot');
+    const packRecs  = recs.filter(r => r.type==='pack');
+    const shootTotal = shootRecs.reduce((s,r) => s+(r.unitPrice||0), 0);
+    const packTotal  = packRecs.reduce((s,r)  => s+(r.unitPrice||0), 0);
+    const [y,m] = month.split('-');
+    return `
+    <div class="month-card">
+      <div class="month-title">${y}年${parseInt(m)}月</div>
+      <div class="month-row"><span>📷 撮影採寸（${shootRecs.length}件）</span><span>¥${shootTotal.toLocaleString()}</span></div>
+      <div class="month-row"><span>📦 梱包発送（${packRecs.length}件）</span><span>¥${packTotal.toLocaleString()}</span></div>
+      <div class="month-row total"><span>合計</span><span>¥${(shootTotal+packTotal).toLocaleString()}</span></div>
+    </div>`;
+  }).join('');
+}
+
+/* ===== 管理者：全商品 ===== */
+function renderAdminItems() {
+  const el = document.getElementById('admin-items-list');
+  const filter = document.getElementById('admin-filter-assignee')?.value || '';
+  let items = _inventory.filter(i => i.status !== 'sold');
+  if (filter) items = items.filter(i => i.assignee === (filter==='奥村'?'A':'B'));
+  items.sort((a,b) => (a.no||0)-(b.no||0));
+  if (!items.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>商品がありません</p></div>`; return; }
+  el.innerHTML = items.map(item => {
+    const hasShoot = _workRecords.some(r => r.itemId===item.id && r.type==='shoot');
+    const hasPack  = _workRecords.some(r => r.itemId===item.id && r.type==='pack');
+    const assigneeLabel = item.assignee==='A'?'奥村さん':item.assignee==='B'?'相川さん':'自分';
+    const stClass = item.status==='listed'?'badge-listed':'badge-unlisted';
+    const stLabel = {unlisted:'未出品',listed:'出品中'}[item.status||'unlisted'];
+    return `
+    <div class="item-card">
+      <div class="item-top">
+        <div>
+          <div class="item-no">No.${item.no||'-'}　担当：${assigneeLabel}</div>
+          <div class="item-brand">${item.brand||'-'}</div>
+        </div>
+        <span class="badge ${stClass}">${stLabel}</span>
+      </div>
+      <div class="item-meta">${item.genre||''}${item.details?' / '+item.details:''}${item.size?'　'+item.size:''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px">
+        <span style="color:${hasShoot?'var(--primary)':'var(--gray-400)'}">📷 ${hasShoot?'撮影採寸済み':'未対応'}</span>
+        <span style="color:${hasPack?'var(--primary)':'var(--gray-400)'}">📦 ${hasPack?'梱包発送済み':'未対応'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ===== 管理者：外注費集計 ===== */
+function renderAdminSummary() {
+  const el = document.getElementById('admin-summary-content');
+  const byMonth = {};
+  _workRecords.forEach(r => {
+    const m = r.date.slice(0,7);
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(r);
+  });
+  const months = Object.keys(byMonth).sort().reverse();
+  if (!months.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><p>作業記録がありません</p></div>`; return; }
+  el.innerHTML = months.map(month => {
+    const recs = byMonth[month];
+    const [y,m] = month.split('-');
+    const calcPerson = (name) => {
+      const pr = recs.filter(r => r.assignee===name);
+      const shoot = pr.filter(r=>r.type==='shoot').reduce((s,r)=>s+(r.unitPrice||0),0);
+      const pack  = pr.filter(r=>r.type==='pack' ).reduce((s,r)=>s+(r.unitPrice||0),0);
+      return { shoot, pack, total: shoot+pack,
+        shootCnt: pr.filter(r=>r.type==='shoot').length,
+        packCnt:  pr.filter(r=>r.type==='pack').length };
+    };
+    const ok = calcPerson('奥村');
+    const ai = calcPerson('相川');
+    const grand = ok.total + ai.total;
+    return `
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">${y}年${parseInt(m)}月</div>
+      <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">奥村さん</div>
+      <div class="month-row"><span>📷 撮影採寸（${ok.shootCnt}件）</span><span>¥${ok.shoot.toLocaleString()}</span></div>
+      <div class="month-row"><span>📦 梱包発送（${ok.packCnt}件）</span><span>¥${ok.pack.toLocaleString()}</span></div>
+      <div class="month-row" style="font-weight:700"><span>奥村さん計</span><span>¥${ok.total.toLocaleString()}</span></div>
+      <div style="height:1px;background:var(--gray-200);margin:10px 0"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">相川さん</div>
+      <div class="month-row"><span>📷 撮影採寸（${ai.shootCnt}件）</span><span>¥${ai.shoot.toLocaleString()}</span></div>
+      <div class="month-row"><span>📦 梱包発送（${ai.packCnt}件）</span><span>¥${ai.pack.toLocaleString()}</span></div>
+      <div class="month-row" style="font-weight:700"><span>相川さん計</span><span>¥${ai.total.toLocaleString()}</span></div>
+      <div style="height:2px;background:var(--primary);margin:10px 0"></div>
+      <div class="month-row" style="font-size:15px;font-weight:700"><span>外注費合計</span><span style="color:var(--primary)">¥${grand.toLocaleString()}</span></div>
+    </div>`;
+  }).join('');
+}
+
+/* ===== 管理者：単価設定 ===== */
+function renderAdminSettings() {
+  const el = document.getElementById('admin-settings-content');
+  const rates = _rates || defaultRates();
+  const genres = ['スーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  el.innerHTML = ['奥村','相川'].map(person => `
+    <div class="card">
+      <div class="card-title">${person}さんの単価</div>
+      <div class="admin-section">
+        <div class="admin-section-title">📷 撮影採寸（ジャンル別）</div>
+        ${genres.map(g => `
+        <div class="rate-row">
+          <span>${g}</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:13px;color:var(--gray-400)">¥</span>
+            <input type="number" id="rate-${person}-shoot-${g}" value="${rates[person]?.shoot?.[g]??150}" min="0" step="10">
+          </div>
+        </div>`).join('')}
+      </div>
+      <div class="admin-section">
+        <div class="admin-section-title">📦 梱包発送（共通）</div>
+        <div class="rate-row">
+          <span>全ジャンル共通</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:13px;color:var(--gray-400)">¥</span>
+            <input type="number" id="rate-${person}-pack" value="${rates[person]?.pack??100}" min="0" step="10">
+          </div>
+        </div>
+      </div>
+    </div>`).join('') +
+    `<button class="btn btn-primary btn-full" onclick="saveRates()">💾 単価を保存する</button>`;
+}
+
+async function saveRates() {
+  const genres = ['スーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const newRates = {};
+  ['奥村','相川'].forEach(person => {
+    newRates[person] = { shoot:{}, pack:0 };
+    genres.forEach(g => {
+      newRates[person].shoot[g] = parseInt(document.getElementById(`rate-${person}-shoot-${g}`)?.value)||0;
+    });
+    newRates[person].pack = parseInt(document.getElementById(`rate-${person}-pack`)?.value)||0;
+  });
+  try {
+    await db.collection('settings').doc('rates').set(newRates);
+    showToast('✅ 単価を保存しました');
+  } catch(e) { showToast('❌ 保存に失敗しました'); }
+}
+
+/* =====================================================
+   出品アシスタント機能
+===================================================== */
+const CATS = [
+  {id:'suit',  label:'スーツ',    icon:'🤵'},
+  {id:'shoes', label:'シューズ',  icon:'👠'},
+  {id:'jersey',label:'ジャージ',  icon:'🏃'},
+  {id:'bag',   label:'バッグ',    icon:'👜'},
+  {id:'tops',  label:'トップス',  icon:'👕'},
+  {id:'one',   label:'ワンピース',icon:'👗'},
+  {id:'pants', label:'パンツ',    icon:'👖'},
+  {id:'skirt', label:'スカート',  icon:'🩱'},
+  {id:'outer', label:'アウター',  icon:'🧥'},
+];
+const CONDITIONS = [
+  {id:'new',     name:'新品・未使用',       desc:'タグ付・未開封'},
+  {id:'likenew', name:'未使用に近い',       desc:'使用感ほぼなし'},
+  {id:'good',    name:'目立った傷・汚れなし',desc:'使用感あるが綺麗'},
+  {id:'fair',    name:'やや傷・汚れあり',   desc:'使用感・汚れあり'},
+  {id:'poor',    name:'傷や汚れあり',       desc:'ダメージ有'},
+  {id:'bad',     name:'全体的に状態が悪い', desc:'大きなダメージ'},
+];
+const SHIPPING = [
+  {id:'rakuraku',name:'らくらくメルカリ便',icon:'🐱',tags:['匿名','追跡','補償']},
+  {id:'nekopos', name:'ネコポス',          icon:'🐱',tags:['匿名','追跡','〜3cm']},
+  {id:'yuyu',    name:'ゆうゆうメルカリ便',icon:'🏣',tags:['匿名','追跡','補償']},
+  {id:'compact', name:'宅急便コンパクト',  icon:'📦',tags:['追跡','補償']},
+  {id:'other',   name:'その他・未定',       icon:'📬',tags:[]},
+];
+const MEASURES = {
+  bag:  [{k:'縦',u:'cm',req:true},{k:'横',u:'cm',req:true},{k:'奥行き',u:'cm',req:true},{k:'持ち手の長さ',u:'cm',req:false},{k:'ショルダー紐',u:'cm',req:false}],
+  tops: [{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:true},{k:'着丈',u:'cm',req:true}],
+  one:  [{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:false},{k:'着丈',u:'cm',req:true},{k:'スカート丈',u:'cm',req:false}],
+  pants:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'股上',u:'cm',req:true},{k:'股下',u:'cm',req:true},{k:'わたり幅',u:'cm',req:false},{k:'裾幅',u:'cm',req:false}],
+  skirt:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'丈',u:'cm',req:true},{k:'裾幅',u:'cm',req:false}],
+  outer:[{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:true},{k:'着丈',u:'cm',req:true}],
+  shoes:[{k:'サイズ',u:'cm',req:true},{k:'インソール長',u:'cm',req:false},{k:'足幅',u:'cm',req:false},{k:'ヒールの高さ',u:'cm',req:false}],
+  suit:'special', jersey:'special_jersey',
+};
+
+let selCat='', selCond='', selShip='';
+let suitType='setup', hemType='single';
+let suitDesign={lining:'',buttons:'',vent:'',options:[]};
+let jerseyType='setup', suitThreePiece=false;
+let genText='';
+let _currentDraftId = null;
+
+// Firestore下書き用
+let _drafts = [];
+let _draftIds = new Set();
+function initFirestoreDrafts() {
+  db.collection('drafts').orderBy('savedAt','desc').onSnapshot(snap => {
+    _drafts = snap.docs.map(d => d.data());
+    _draftIds = new Set(snap.docs.map(d => d.id));
+  }, err => {
+    _drafts = JSON.parse(localStorage.getItem('hs-drafts')||'[]');
+  });
+}
+function getDrafts(){ return _drafts; }
+function putDrafts(d){
+  _drafts = d;
+  const batch = db.batch();
+  const colRef = db.collection('drafts');
+  const newIds = new Set(d.map(item=>String(item.id)));
+  _draftIds.forEach(id=>{ if(!newIds.has(id)) batch.delete(colRef.doc(id)); });
+  d.forEach(item=>batch.set(colRef.doc(String(item.id)),item));
+  batch.commit().then(()=>{ _draftIds=newIds; }).catch(()=>{
+    localStorage.setItem('hs-drafts',JSON.stringify(d));
+  });
+}
+
+function initMeasureForm() {
+  // カテゴリ
+  const grid = document.getElementById('cat-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  CATS.forEach(c => {
+    const b = document.createElement('div');
+    b.className='cat-btn'; b.dataset.id=c.id;
+    b.innerHTML=`<span class="ci">${c.icon}</span><span class="cl">${c.label}</span>`;
+    b.onclick=()=>selectCat(c.id);
+    grid.appendChild(b);
+  });
+  // 状態
+  const cg = document.getElementById('cond-grid');
+  if (!cg) return;
+  cg.innerHTML = '';
+  CONDITIONS.forEach(c => {
+    const d = document.createElement('div');
+    d.className='cond'; d.dataset.id=c.id;
+    d.innerHTML=`<div class="cond-name">${c.name}</div><div class="cond-desc">${c.desc}</div>`;
+    d.onclick=()=>{ document.querySelectorAll('.cond').forEach(x=>x.classList.remove('on')); d.classList.add('on'); selCond=c.id; };
+    cg.appendChild(d);
+  });
+  // 配送
+  const sl = document.getElementById('ship-list');
+  if (!sl) return;
+  sl.innerHTML = '';
+  SHIPPING.forEach(s => {
+    const d = document.createElement('div');
+    d.className='ship'; d.dataset.id=s.id;
+    d.innerHTML=`<div class="ship-name">${s.icon} ${s.name}</div><div class="ship-tags">${s.tags.map(t=>`<span class="ship-tag">${t}</span>`).join('')}</div>`;
+    d.onclick=()=>{ document.querySelectorAll('.ship').forEach(x=>x.classList.remove('on')); d.classList.add('on'); selShip=s.id; };
+    sl.appendChild(d);
+  });
+  initFirestoreDrafts();
+}
+
+function selectCat(id){
+  selCat=id;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  renderMeasures();
+  if(id==='suit'){
+    const appealEl=document.getElementById('f-appeal');
+    if(appealEl&&!appealEl.value.trim()) appealEl.value='全体的に使用感が少なく状態良好です！\nまだまだご使用いただけます。';
+  }
+}
+
+function renderMeasures(){
+  const area=document.getElementById('measure-area');
+  const schema=MEASURES[selCat];
+  if(!schema){area.innerHTML='<div style="color:var(--gray-400);text-align:center;padding:20px;font-size:13px">↑ カテゴリを選択してください</div>';return;}
+  if(schema==='special'){renderSuitMeasures(area);return;}
+  if(schema==='special_jersey'){renderJerseyMeasures(area);return;}
+  area.innerHTML=schema.map(m=>`
+    <div class="mr">
+      <div class="ml">${m.k}<small>${m.req?'':'任意'}</small></div>
+      <div class="mw"><input type="number" id="m-${m.k}" placeholder="0.0" step="0.5" min="0"><span class="mu">${m.u}</span></div>
+    </div>`).join('');
+}
+
+function renderSuitMeasures(area){
+  area.innerHTML=`
+    <div class="fg"><div class="fl">種別</div>
+      <div class="rg" id="suit-type-rg">
+        <div class="rb on" data-v="setup" onclick="setSuitType('setup')">セットアップ</div>
+        <div class="rb" data-v="jacket" onclick="setSuitType('jacket')">ジャケット単品</div>
+        <div class="rb" data-v="pants_only" onclick="setSuitType('pants_only')">パンツ単品</div>
+      </div>
+    </div>
+    <div id="suit-jacket-sec"><div class="suit-sec">
+      <div class="suit-sec-ttl">🧥 ジャケット採寸</div>
+      <div class="mr"><div class="ml">肩幅</div><div class="mw"><input type="number" id="sj-kata" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">身幅</div><div class="mw"><input type="number" id="sj-mimi" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">袖丈</div><div class="mw"><input type="number" id="sj-sode" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">着丈</div><div class="mw"><input type="number" id="sj-take" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+    </div></div>
+    <div id="suit-pants-sec"><div class="suit-sec">
+      <div class="suit-sec-ttl">👖 パンツ採寸</div>
+      <div class="mr"><div class="ml">ウエスト</div><div class="mw"><input type="number" id="sp-waist" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">総丈</div><div class="mw"><input type="number" id="sp-sozo" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">わたり幅</div><div class="mw"><input type="number" id="sp-watari" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">股下</div><div class="mw"><input type="number" id="sp-inseam" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">裾幅</div><div class="mw"><input type="number" id="sp-hem" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">裾余り</div><div class="mw"><input type="number" id="sp-hemextra" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="fg" style="margin-top:10px"><div class="fl">裾仕様</div>
+        <div class="rg" id="hem-type-rg">
+          <div class="rb on" data-v="single" onclick="setHemType('single')">シングル</div>
+          <div class="rb" data-v="double" onclick="setHemType('double')">ダブル</div>
+        </div>
+      </div>
+      <div class="mr" id="hem-fold-row" style="display:none;margin-top:4px">
+        <div class="ml">折り返し幅</div>
+        <div class="mw"><input type="number" id="sp-fold" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div>
+      </div>
+    </div></div>
+    <div class="fg" style="margin-bottom:4px"><div class="fl">スリーピース</div>
+      <div class="rg"><div class="rb" id="three-piece-btn" onclick="setSuitThreePiece()">3ピース（ベスト付き）</div></div>
+    </div>
+    <div id="suit-vest-sec" style="display:none"><div class="suit-sec">
+      <div class="suit-sec-ttl">🦺 ベスト採寸</div>
+      <div class="mr"><div class="ml">肩幅</div><div class="mw"><input type="number" id="sv-kata" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">身幅</div><div class="mw"><input type="number" id="sv-mimi" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">着丈</div><div class="mw"><input type="number" id="sv-take" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+    </div></div>
+    <div class="suit-sec"><div class="suit-sec-ttl">🎨 デザイン・仕様</div>
+      <div class="fg"><div class="fl">裏地</div><div class="rg">
+        <div class="rb" data-g="lining" data-v="背抜き" onclick="setSuitDesignRadio('lining','背抜き')">背抜き</div>
+        <div class="rb" data-g="lining" data-v="総裏" onclick="setSuitDesignRadio('lining','総裏')">総裏</div>
+      </div></div>
+      <div class="fg"><div class="fl">ボタン</div><div class="rg">
+        <div class="rb" data-g="buttons" data-v="2つボタン" onclick="setSuitDesignRadio('buttons','2つボタン')">2つボタン</div>
+        <div class="rb" data-g="buttons" data-v="3つボタン" onclick="setSuitDesignRadio('buttons','3つボタン')">3つボタン</div>
+        <div class="rb" data-g="buttons" data-v="段返り3つボタン" onclick="setSuitDesignRadio('buttons','段返り3つボタン')">段返り3つボタン</div>
+      </div></div>
+      <div class="fg"><div class="fl">ベント</div><div class="rg">
+        <div class="rb" data-g="vent" data-v="センターベント" onclick="setSuitDesignRadio('vent','センターベント')">センターベント</div>
+        <div class="rb" data-g="vent" data-v="サイドベンツ" onclick="setSuitDesignRadio('vent','サイドベンツ')">サイドベンツ</div>
+      </div></div>
+      <div class="fg"><div class="fl">オプション <span class="opt">複数選択可</span></div>
+        <div class="rg" id="suit-options-rg" style="flex-wrap:wrap">
+          <div class="rb" data-v="ダブルブレスト" onclick="toggleSuitOption(this)">ダブルブレスト</div>
+          <div class="rb" data-v="本切羽" onclick="toggleSuitOption(this)">本切羽</div>
+          <div class="rb" data-v="ストレッチ" onclick="toggleSuitOption(this)">ストレッチ</div>
+          <div class="rb" data-v="ウォッシャブル" onclick="toggleSuitOption(this)">ウォッシャブル</div>
+          <div class="rb" data-v="ウール100%" onclick="toggleSuitOption(this)">ウール100%</div>
+        </div>
+      </div>
+      <div class="fg"><div class="fl">その他・色柄 <span class="opt">任意</span></div>
+        <input type="text" id="suit-design-memo" placeholder="例：グレー系、ストライプ、チェック">
+      </div>
+    </div>`;
+  setSuitType(suitType);
+  suitThreePiece=false;
+}
+
+function setSuitType(v){
+  suitType=v;
+  document.querySelectorAll('#suit-type-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  const jSec=document.getElementById('suit-jacket-sec');
+  const pSec=document.getElementById('suit-pants-sec');
+  if(jSec) jSec.style.display=(v==='pants_only')?'none':'block';
+  if(pSec) pSec.style.display=(v==='jacket')?'none':'block';
+}
+function setHemType(v){
+  hemType=v;
+  document.querySelectorAll('#hem-type-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  const row=document.getElementById('hem-fold-row');
+  if(row) row.style.display=(v==='double')?'flex':'none';
+}
+function setSuitThreePiece(){
+  suitThreePiece=!suitThreePiece;
+  const btn=document.getElementById('three-piece-btn'); if(btn) btn.classList.toggle('on',suitThreePiece);
+  const sec=document.getElementById('suit-vest-sec'); if(sec) sec.style.display=suitThreePiece?'block':'none';
+}
+function renderJerseyMeasures(area){
+  area.innerHTML=`
+    <div class="fg"><div class="fl">種別</div>
+      <div class="rg" id="jersey-type-rg">
+        <div class="rb on" data-v="setup" onclick="setJerseyType('setup')">セットアップ</div>
+        <div class="rb" data-v="jacket_only" onclick="setJerseyType('jacket_only')">トラックジャケットのみ</div>
+      </div>
+    </div>
+    <div id="jersey-jacket-sec"><div class="suit-sec">
+      <div class="suit-sec-ttl">🏃 ジャケット採寸</div>
+      <div class="mr"><div class="ml">肩幅</div><div class="mw"><input type="number" id="jj-kata" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">身幅</div><div class="mw"><input type="number" id="jj-mimi" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">袖丈</div><div class="mw"><input type="number" id="jj-sode" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">着丈</div><div class="mw"><input type="number" id="jj-take" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">襟<small>任意</small></div><div class="mw"><input type="text" id="jj-collar" placeholder="例：スタンドカラー" style="text-align:left"></div></div>
+    </div></div>
+    <div id="jersey-pants-sec"><div class="suit-sec">
+      <div class="suit-sec-ttl">👖 パンツ採寸</div>
+      <div class="mr"><div class="ml">ウエスト</div><div class="mw"><input type="number" id="jp-waist" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">総丈</div><div class="mw"><input type="number" id="jp-sozo" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">股下</div><div class="mw"><input type="number" id="jp-inseam" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+    </div></div>`;
+  setJerseyType(jerseyType);
+}
+function setJerseyType(val){
+  jerseyType=val;
+  document.querySelectorAll('#jersey-type-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===val));
+  const pSec=document.getElementById('jersey-pants-sec');
+  if(pSec) pSec.style.display=(val==='jacket_only')?'none':'block';
+}
+function setSuitDesignRadio(group,val){
+  suitDesign[group]=suitDesign[group]===val?'':val;
+  document.querySelectorAll(`[data-g="${group}"]`).forEach(b=>b.classList.toggle('on',b.dataset.v===suitDesign[group]));
+}
+function toggleSuitOption(el){
+  const val=el.dataset.v;
+  const idx=suitDesign.options.indexOf(val);
+  if(idx>=0) suitDesign.options.splice(idx,1); else suitDesign.options.push(val);
+  el.classList.toggle('on',suitDesign.options.includes(val));
+}
+function buildSuitDesignLines(){
+  const parts=[];
+  if(suitDesign.lining) parts.push(suitDesign.lining);
+  if(suitDesign.buttons) parts.push(suitDesign.buttons);
+  if(suitDesign.vent) parts.push(suitDesign.vent);
+  suitDesign.options.forEach(o=>parts.push(o));
+  const memo=fv('suit-design-memo'); if(memo) parts.push(memo);
+  return parts;
+}
+
+function fv(id){ const el=document.getElementById(id); return el?el.value.trim():''; }
+function fm(id){ const el=document.getElementById(id); return el?parseFloat(el.value)||0:0; }
+function fcm(id){ const val=fm(id); return val>0?val+'cm':'－'; }
+
+function generateText(){
+  const name=fv('f-name'),brand=fv('f-brand'),size=fv('f-size'),mgmt=fv('f-mgmt'),appeal=fv('f-appeal'),tags=fv('f-tags'),price=fv('f-price');
+  const condObj=CONDITIONS.find(c=>c.id===selCond);
+  const shipObj=SHIPPING.find(s=>s.id===selShip);
+  let lines=[];
+  if(name)  lines.push(`【商品名】${name}`);
+  if(brand) lines.push(`【ブランド】${brand}`);
+  if(size)  lines.push(`【サイズ表記】${size}`);
+  if(condObj) lines.push(`【商品の状態】${condObj.name}`);
+  lines.push('');
+  const schema=MEASURES[selCat];
+  if(schema&&schema!=='special'&&schema!=='special_jersey'&&selCat){
+    lines.push('■ 採寸データ（平置き実寸）');
+    schema.forEach(ms=>{ const val=fm('m-'+ms.k); if(val>0) lines.push(`${ms.k}：${val}cm`); });
+    lines.push('');
+  } else if(selCat==='suit'){
+    const st=suitType;
+    const designParts=buildSuitDesignLines();
+    const stLabel=st==='setup'?(suitThreePiece?'3ピース セットアップ':'セットアップ'):st==='jacket'?'ジャケット単品':'パンツ単品';
+    lines=[];
+    lines.push('コメントなしの即購入、歓迎です！');lines.push('');lines.push('・24時間以内発送');lines.push('・匿名配送');
+    lines.push('');lines.push('');lines.push('■その他同サイズスーツ');lines.push('#ひなたスーツS');
+    lines.push('');lines.push('');lines.push('■ブランド');if(brand) lines.push(brand);
+    lines.push('');lines.push('ビジネススーツ');lines.push(stLabel);
+    if(st==='setup') lines.push(suitThreePiece?'ジャケット　ベスト　スラックス':'ジャケット　スラックス');
+    lines.push('');
+    if(designParts.length){lines.push('■デザイン');designParts.forEach(p=>lines.push(p));lines.push('');}
+    lines.push('');lines.push('■サイズ');
+    if(st!=='pants_only'){
+      lines.push('・ジャケット');if(size) lines.push(`表記：${size}`);
+      lines.push(`着丈：${fcm('sj-take')}`);lines.push(`肩幅：${fcm('sj-kata')}`);
+      lines.push(`身幅：${fcm('sj-mimi')}`);lines.push(`袖丈：${fcm('sj-sode')}`);
+    }
+    if(suitThreePiece&&st!=='pants_only'){
+      lines.push('');lines.push('・ベスト');
+      lines.push(`肩幅：${fcm('sv-kata')}`);lines.push(`身幅：${fcm('sv-mimi')}`);lines.push(`着丈：${fcm('sv-take')}`);
+    }
+    if(st!=='jacket'){
+      if(st!=='pants_only') lines.push('');
+      lines.push('・パンツ');if(size) lines.push(`表記　　：${size}`);
+      lines.push(`ウエスト：${fcm('sp-waist')}`);lines.push(`総丈　　：${fcm('sp-sozo')}`);
+      if(fm('sp-inseam')>0) lines.push(`股下　　：${fcm('sp-inseam')}`);
+      lines.push(`わたり幅：${fcm('sp-watari')}`);lines.push(`裾幅　　：${fcm('sp-hem')}`);
+      lines.push('');
+      lines.push(hemType==='double'?`ダブル仕上げ${fm('sp-fold')>0?' （折り返し'+fcm('sp-fold')+'）':''}`:'シングル仕上げ');
+      if(fm('sp-hemextra')>0){lines.push('');lines.push(`裾折り返し${fm('sp-hemextra')}cmほどあるので、お直し可能`);}
+    }
+    lines.push('');lines.push('※平置き実寸。素人採寸です。');lines.push('誤差はご了承ください。');
+    lines.push('');lines.push('■状態');lines.push(appeal||'');
+    lines.push('');lines.push('■補足');
+    lines.push('あくまでも中古品です。');lines.push('新品をお求めの方、神経質な方はご遠慮下さい。');
+    lines.push('ご理解頂ける方ご購入お待ちしております。');
+    lines.push('');lines.push('');lines.push('■発送');
+    lines.push('※送料の関係でコンパクトに畳んで発送いたします。');
+    lines.push('畳みジワが発生しますことをご了承くださいませ。');
+    lines.push('');
+    lines.push('結婚式 、二次会、ウエディングフォト、成人式、卒業式、入学式、セレモニー、パーティー、式典、舞台衣装、ステージ衣装、ライブ、スーツ、プライベートとオールシーズン様々なシーンで活躍します。');
+    if(mgmt) lines.push(`\n【管理番号】${mgmt}`);
+  } else if(selCat==='jersey'){
+    const jt=jerseyType;
+    const jtLabel=jt==='setup'?'セットアップ':'トラックジャケット';
+    lines.push(`■ 採寸データ（平置き実寸）【ジャージ ${jtLabel}】`);
+    lines.push('・ジャケット');
+    lines.push(`肩幅：${fcm('jj-kata')}`);lines.push(`身幅：${fcm('jj-mimi')}`);
+    lines.push(`袖丈：${fcm('jj-sode')}`);lines.push(`着丈：${fcm('jj-take')}`);
+    const collar=document.getElementById('jj-collar');
+    if(collar&&collar.value.trim()) lines.push(`襟：${collar.value.trim()}`);
+    if(jt!=='jacket_only'){
+      lines.push('');lines.push('・パンツ');
+      lines.push(`ウエスト：${fcm('jp-waist')}`);lines.push(`総丈：${fcm('jp-sozo')}`);lines.push(`股下：${fcm('jp-inseam')}`);
+    }
+    lines.push('');
+  }
+  if(appeal&&selCat!=='suit'){lines.push('■ アピールポイント・状態の詳細');lines.push(appeal);lines.push('');}
+  if(shipObj) lines.push(`【配送方法】${shipObj.name}`);
+  if(price)   lines.push(`【価格】¥${Number(price).toLocaleString()}`);
+  if(mgmt&&selCat!=='suit') lines.push(`【管理番号】${mgmt}`);
+  if(tags){lines.push('');lines.push(tags);}
+  genText=lines.join('\n');
+  if(!genText.trim()){showToast('⚠️ 商品情報を入力してください');return;}
+  document.getElementById('gen-preview').textContent=genText;
+  document.getElementById('copy-ok').style.display='none';
+  document.getElementById('gen-overlay').classList.add('open');
+}
+
+function copyGenText(){
+  if(!genText) return;
+  navigator.clipboard.writeText(genText).then(()=>{
+    document.getElementById('copy-ok').style.display='block';
+    showToast('✅ コピーしました');
+  }).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=genText;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    document.getElementById('copy-ok').style.display='block';
+    showToast('✅ コピーしました');
+  });
+}
+function closeGenModal(e){
+  if(!e||e.target===document.getElementById('gen-overlay'))
+    document.getElementById('gen-overlay').classList.remove('open');
+}
+
+function collectFormData(){
+  return {
+    cat:selCat,cond:selCond,ship:selShip,
+    mgmt:fv('f-mgmt'),name:fv('f-name'),brand:fv('f-brand'),
+    size:fv('f-size'),appeal:fv('f-appeal'),tags:fv('f-tags'),price:fv('f-price'),
+    suitType,hemType,
+    suit_design:selCat==='suit'?{...suitDesign,options:[...suitDesign.options],memo:fv('suit-design-memo')}:null,
+    measures:collectMeasures(),
+    savedAt:new Date().toISOString(),
+  };
+}
+function collectMeasures(){
+  const schema=MEASURES[selCat];
+  if(!schema) return {};
+  if(schema==='special'){
+    return {
+      sj_kata:fm('sj-kata'),sj_mimi:fm('sj-mimi'),sj_sode:fm('sj-sode'),sj_take:fm('sj-take'),
+      sp_waist:fm('sp-waist'),sp_sozo:fm('sp-sozo'),sp_inseam:fm('sp-inseam'),sp_watari:fm('sp-watari'),
+      sp_hem:fm('sp-hem'),sp_hemextra:fm('sp-hemextra'),sp_fold:fm('sp-fold'),
+      sv_kata:suitThreePiece?fm('sv-kata'):0,sv_mimi:suitThreePiece?fm('sv-mimi'):0,sv_take:suitThreePiece?fm('sv-take'):0,
+      suitThreePiece,
+    };
+  }
+  if(schema==='special_jersey'){
+    const collarEl=document.getElementById('jj-collar');
+    return {
+      jj_kata:fm('jj-kata'),jj_mimi:fm('jj-mimi'),jj_sode:fm('jj-sode'),jj_take:fm('jj-take'),
+      jj_collar:collarEl?collarEl.value.trim():'',
+      jp_waist:fm('jp-waist'),jp_sozo:fm('jp-sozo'),jp_inseam:fm('jp-inseam'),jerseyType,
+    };
+  }
+  const obj={};
+  schema.forEach(ms=>{ obj[ms.k]=fm('m-'+ms.k); });
+  return obj;
+}
+
+function saveDraft(){
+  const data=collectFormData();
+  if(!data.name&&!data.brand){showToast('⚠️ 商品名またはブランド名を入力してください');return;}
+  const drafts=getDrafts();
+  if(_currentDraftId!==null){
+    const idx=drafts.findIndex(d=>d.id===_currentDraftId);
+    if(idx!==-1) drafts[idx]={id:_currentDraftId,...data};
+    else drafts.unshift({id:_currentDraftId,...data});
+    showToast('💾 下書きを上書き保存しました');
+  } else {
+    _currentDraftId=Date.now();
+    drafts.unshift({id:_currentDraftId,...data});
+    showToast('💾 下書きを保存しました');
+  }
+  putDrafts(drafts);
+}
+
+function resetMeasureForm(){
+  ['f-mgmt','f-name','f-brand','f-size','f-appeal','f-tags','f-price'].forEach(id=>{
+    const el=document.getElementById(id);if(el) el.value='';
+  });
+  document.getElementById('name-cnt').textContent='0/40';
+  selCat='';selCond='';selShip='';
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.cond').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.ship').forEach(b=>b.classList.remove('on'));
+  document.getElementById('measure-area').innerHTML=
+    '<div style="color:var(--gray-400);text-align:center;padding:20px;font-size:13px">↑ カテゴリを選択すると採寸項目が表示されます</div>';
+  suitType='setup';hemType='single';
+  suitDesign={lining:'',buttons:'',vent:'',options:[]};
+  jerseyType='setup';suitThreePiece=false;
+  genText='';_currentDraftId=null;
+  showToast('🔄 リセットしました');
+}
+
+/* ===== TOAST ===== */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('on');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2400);
+}
+</script>
+</body>
+</html>
