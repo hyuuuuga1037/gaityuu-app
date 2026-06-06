@@ -504,34 +504,33 @@ function startApp() {
 /* ===== STATE ===== */
 let currentTab = 'items';
 let _inventory = [];
+let _assignees = {}; // { itemId: assignee } 担当者データ専用
 let _workRecords = [];
 let _rates = null;
 let _selectedItemId = null; // 採寸タブで選択中の商品ID
 
 /* ===== DATA ===== */
 function initData() {
-  // 在庫管理アプリと同じドメインのLocalStorageから直接読み込む（最速・確実）
-  function loadFromLocal() {
-    const raw = localStorage.getItem('apparel_items');
-    if (raw) {
-      _inventory = JSON.parse(raw);
-      renderCurrentTab();
-    }
-  }
-  loadFromLocal();
-  // Firestoreからも読み込み（他デバイス用）
+  // 在庫データ（Firestoreから）
   db.collection('inventory').onSnapshot(snap => {
-    const fsData = snap.docs.map(d => d.data());
-    // LocalStorageのデータが多い場合はそちらを優先
-    const localRaw = localStorage.getItem('apparel_items');
-    const localData = localRaw ? JSON.parse(localRaw) : [];
-    _inventory = localData.length >= fsData.length ? localData : fsData;
+    _inventory = snap.docs.map(d => d.data());
     renderCurrentTab();
   });
+  // 担当者データ（専用コレクションから）
+  db.collection('assignees').onSnapshot(snap => {
+    _assignees = {};
+    snap.docs.forEach(doc => {
+      const d = doc.data();
+      _assignees[String(d.id)] = d.assignee;
+    });
+    renderCurrentTab();
+  });
+  // 作業記録
   db.collection('work_records').orderBy('date','desc').onSnapshot(snap => {
     _workRecords = snap.docs.map(d => ({ fsId: d.id, ...d.data() }));
     renderCurrentTab();
   });
+  // 単価設定
   db.collection('settings').doc('rates').onSnapshot(snap => {
     _rates = snap.exists ? snap.data() : defaultRates();
     renderCurrentTab();
@@ -568,13 +567,14 @@ function renderCurrentTab() {
 }
 
 /* ===== 担当商品 ===== */
-function myAssigneeKey() { return currentUser; } // '奥村' or '相川' をそのまま使用
+function myAssigneeKey() { return currentUser; }
 function myItems() {
+  const legacyKey = currentUser === '奥村' ? 'A' : 'B';
   return _inventory
     .filter(i => {
-      // 新方式（名前で比較）と旧方式（A/B）の両方に対応
-      const legacyKey = currentUser === '奥村' ? 'A' : 'B';
-      return (i.assignee === currentUser || i.assignee === legacyKey) && i.status !== 'sold';
+      // assigneesコレクションのデータを優先、なければitemのassigneeフィールドを参照
+      const assignee = _assignees[String(i.id)] || i.assignee || '';
+      return (assignee === currentUser || assignee === legacyKey) && i.status !== 'sold';
     })
     .sort((a,b) => (a.no||0) - (b.no||0));
 }
@@ -583,9 +583,7 @@ function renderItems() {
   const el = document.getElementById('items-list');
   const items = myItems();
   if (!items.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p>
-      <button onclick="debugFirestore()" style="margin-top:12px;padding:8px 16px;background:#0F766E;color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px">🔍 データ確認</button>
-    </div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p></div>`;
     return;
   }
   el.innerHTML = items.map(item => {
@@ -738,13 +736,20 @@ function renderAdminItems() {
   const el = document.getElementById('admin-items-list');
   const filter = document.getElementById('admin-filter-assignee')?.value || '';
   let items = _inventory.filter(i => i.status !== 'sold');
-  if (filter) items = items.filter(i => i.assignee === (filter==='奥村'?'A':'B'));
+  if (filter) {
+    const legacyKey = filter === '奥村' ? 'A' : 'B';
+    items = items.filter(i => {
+      const a = _assignees[String(i.id)] || i.assignee || '';
+      return a === filter || a === legacyKey;
+    });
+  }
   items.sort((a,b) => (a.no||0)-(b.no||0));
   if (!items.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>商品がありません</p></div>`; return; }
   el.innerHTML = items.map(item => {
     const hasShoot = _workRecords.some(r => r.itemId===item.id && r.type==='shoot');
     const hasPack  = _workRecords.some(r => r.itemId===item.id && r.type==='pack');
-    const assigneeLabel = item.assignee==='A'?'奥村さん':item.assignee==='B'?'相川さん':'自分';
+    const a = _assignees[String(item.id)] || item.assignee || '';
+    const assigneeLabel = (a==='奥村'||a==='A')?'奥村さん':(a==='相川'||a==='B')?'相川さん':'自分';
     const stClass = item.status==='listed'?'badge-listed':'badge-unlisted';
     const stLabel = {unlisted:'未出品',listed:'出品中'}[item.status||'unlisted'];
     return `
@@ -1328,16 +1333,6 @@ function resetMeasureForm(){
 }
 
 /* ===== TOAST ===== */
-function debugFirestore() {
-  Promise.all([
-    db.collection('inventory').where('assignee','==','相川').get(),
-    db.collection('inventory').where('assignee','==','B').get(),
-    db.collection('inventory').where('assignee','==','奥村').get(),
-    db.collection('inventory').where('assignee','==','A').get(),
-  ]).then(([r1,r2,r3,r4]) => {
-    alert(`Firestoreの実データ:\n相川: ${r1.size}件\nB(旧): ${r2.size}件\n奥村: ${r3.size}件\nA(旧): ${r4.size}件`);
-  }).catch(e => alert('エラー: ' + e.message));
-}
 
 function showToast(msg){
   const t=document.getElementById('toast');
