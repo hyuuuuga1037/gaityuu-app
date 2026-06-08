@@ -288,6 +288,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <!-- 📋 採寸・説明文 -->
   <div class="panel" id="panel-measure">
     <div id="selected-item-banner"></div>
+    <!-- 保存済み下書き一覧 -->
+    <div class="card">
+      <div class="sec-ttl">📂 保存済み下書き（<span id="draft-count">0</span>件）</div>
+      <div id="draft-list"></div>
+    </div>
     <!-- カテゴリ -->
     <div class="card">
       <div class="sec-ttl">カテゴリ</div>
@@ -558,7 +563,7 @@ function renderCurrentTab() {
   if (!currentUser) return;
   switch(currentTab) {
     case 'items':          renderItems(); break;
-    case 'measure':        renderSelectedBanner(); break;
+    case 'measure':        renderSelectedBanner(); renderDraftList(); break;
     case 'summary':        renderSummary(); break;
     case 'admin-items':    renderAdminItems(); break;
     case 'admin-summary':  renderAdminSummary(); break;
@@ -934,9 +939,101 @@ function initFirestoreDrafts() {
   db.collection('drafts').orderBy('savedAt','desc').onSnapshot(snap => {
     _drafts = snap.docs.map(d => d.data());
     _draftIds = new Set(snap.docs.map(d => d.id));
+    renderDraftList();
   }, err => {
     _drafts = JSON.parse(localStorage.getItem('hs-drafts')||'[]');
+    renderDraftList();
   });
+}
+
+/* ===== 下書き一覧 ===== */
+function renderDraftList() {
+  const el = document.getElementById('draft-list');
+  const cntEl = document.getElementById('draft-count');
+  if (!el) return;
+  const drafts = getDrafts();
+  if (cntEl) cntEl.textContent = drafts.length;
+  if (!drafts.length) {
+    el.innerHTML = '<div style="color:var(--gray-400);text-align:center;padding:16px;font-size:13px">保存された下書きはありません</div>';
+    return;
+  }
+  el.innerHTML = drafts.map(d => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="min-width:0;overflow:hidden">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
+      </div>
+    </div>`).join('');
+}
+
+function loadDraftIntoForm(id) {
+  const draft = getDrafts().find(d => d.id === id);
+  if (!draft) return;
+  _currentDraftId = id;
+  _selectedItemId = null;
+  renderSelectedBanner();
+
+  const setVal = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v || ''; };
+  setVal('f-mgmt', draft.mgmt);
+  setVal('f-name', draft.name);
+  setVal('f-brand', draft.brand);
+  setVal('f-size', draft.size);
+  setVal('f-appeal', draft.appeal);
+  setVal('f-tags', draft.tags);
+  setVal('f-price', draft.price);
+  const nameEl = document.getElementById('f-name');
+  if (nameEl) document.getElementById('name-cnt').textContent = (nameEl.value||'').length + '/40';
+
+  // 状態・配送
+  selCond = draft.cond || '';
+  selShip = draft.ship || '';
+  document.querySelectorAll('.cond').forEach(x => x.classList.toggle('on', x.dataset.id === selCond));
+  document.querySelectorAll('.ship').forEach(x => x.classList.toggle('on', x.dataset.id === selShip));
+
+  // スーツ・ジャージ系の状態を復元
+  if (draft.suitType) suitType = draft.suitType;
+  if (draft.hemType) hemType = draft.hemType;
+  if (draft.suit_design) {
+    suitDesign = {
+      lining: draft.suit_design.lining || '',
+      buttons: draft.suit_design.buttons || '',
+      vent: draft.suit_design.vent || '',
+      options: [...(draft.suit_design.options || [])]
+    };
+  }
+  if (draft.measures && typeof draft.measures.suitThreePiece !== 'undefined') {
+    suitThreePiece = !!draft.measures.suitThreePiece;
+  }
+
+  // カテゴリ選択 → 採寸エリアを再描画してから数値を反映
+  if (draft.cat) selectCat(draft.cat);
+
+  setTimeout(() => {
+    const m = draft.measures || {};
+    Object.keys(m).forEach(k => {
+      if (k === 'suitThreePiece') return;
+      const inputId = 'm-' + k.replace(/_/g, '-');
+      const el = document.getElementById(inputId);
+      if (el && m[k]) el.value = m[k];
+    });
+  }, 50);
+
+  switchTab('measure');
+  window.scrollTo(0, 0);
+  showToast('📂 下書きを読み込みました');
+}
+
+function deleteDraftConfirm(id) {
+  if (!confirm('この下書きを削除しますか？')) return;
+  const drafts = getDrafts().filter(d => d.id !== id);
+  putDrafts(drafts);
+  if (_currentDraftId === id) _currentDraftId = null;
+  renderDraftList();
+  showToast('🗑️ 下書きを削除しました');
 }
 function getDrafts(){ return _drafts; }
 function putDrafts(d){
@@ -1312,6 +1409,7 @@ function saveDraft(){
     showToast('💾 下書きを保存しました');
   }
   putDrafts(drafts);
+  renderDraftList();
 }
 
 function resetMeasureForm(){
