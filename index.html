@@ -276,6 +276,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <!-- 管理者用タブ -->
   <div class="tabs" id="admin-tabs" style="display:none">
     <div class="tab on" data-tab="admin-items" onclick="switchTab('admin-items')">📦 全商品</div>
+    <div class="tab" data-tab="measure" onclick="switchTab('measure')">📋 採寸・説明文</div>
     <div class="tab" data-tab="admin-summary" onclick="switchTab('admin-summary')">💰 外注費集計</div>
     <div class="tab" data-tab="admin-settings" onclick="switchTab('admin-settings')">⚙️ 単価設定</div>
   </div>
@@ -503,7 +504,7 @@ function startApp() {
   });
 
   initData();
-  if (!isAdmin) initMeasureForm();
+  initMeasureForm(); // 採寸フォームは管理者・外注スタッフ共通で使用
 }
 
 /* ===== STATE ===== */
