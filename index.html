@@ -728,6 +728,9 @@ function renderSummary() {
   const spaceEnabled = userRates.spaceEnabled || false;
   const spaceAmount  = userRates.spaceAmount  || 0;
 
+  const itemMap = {};
+  _inventory.forEach(i => { itemMap[i.id] = i; });
+
   el.innerHTML = months.map(month => {
     const recs = byMonth[month];
     const shootRecs = recs.filter(r => r.type==='shoot');
@@ -736,6 +739,16 @@ function renderSummary() {
     const packTotal  = packRecs.reduce((s,r)  => s+(r.unitPrice||0), 0);
     const grandTotal = shootTotal + packTotal + (spaceEnabled ? spaceAmount : 0);
     const [y,m] = month.split('-');
+
+    const detailRows = recs.slice().sort((a,b) => (a.date < b.date ? 1 : -1)).map(r => {
+      const item = itemMap[r.itemId] || {};
+      const icon = r.type==='shoot' ? '📷' : '📦';
+      const label = r.type==='shoot' ? '撮影採寸' : '梱包発送';
+      const dateStr = r.date ? r.date.slice(5).replace('-','/') : '';
+      const itemLabel = `No.${item.no||'-'}${item.brand?' '+item.brand:''}${item.details?' '+item.details:''}`;
+      return `<div class="month-row" style="font-size:12px;color:var(--gray-500)"><span>${dateStr}　${icon} ${label}　${itemLabel}</span><span>¥${(r.unitPrice||0).toLocaleString()}</span></div>`;
+    }).join('');
+
     return `
     <div class="month-card">
       <div class="month-title">${y}年${parseInt(m)}月</div>
@@ -743,6 +756,10 @@ function renderSummary() {
       <div class="month-row"><span>📦 梱包発送（${packRecs.length}件）</span><span>¥${packTotal.toLocaleString()}</span></div>
       ${spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${spaceAmount.toLocaleString()}</span></div>` : ''}
       <div class="month-row total"><span>合計</span><span>¥${grandTotal.toLocaleString()}</span></div>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--primary)">明細を見る（${recs.length}件）</summary>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--gray-200)">${detailRows}</div>
+      </details>
     </div>`;
   }).join('');
 }
