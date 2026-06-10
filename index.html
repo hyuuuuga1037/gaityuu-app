@@ -953,12 +953,17 @@ function renderDraftList() {
   const cntEl = document.getElementById('draft-count');
   if (!el) return;
   const drafts = getDrafts();
-  if (cntEl) cntEl.textContent = drafts.length;
-  if (!drafts.length) {
+  // 担当者でフィルタリング（管理者は全件表示、外注スタッフは自分宛のみ）
+  const legacyKey = currentUser === '奥村' ? 'A' : 'B';
+  const filtered = currentUser === 'admin' ? drafts : drafts.filter(d =>
+    !d.fromRequest || !d.assignee || d.assignee === currentUser || d.assignee === legacyKey
+  );
+  if (cntEl) cntEl.textContent = filtered.length;
+  if (!filtered.length) {
     el.innerHTML = '<div style="color:var(--gray-400);text-align:center;padding:16px;font-size:13px">保存された下書きはありません</div>';
     return;
   }
-  el.innerHTML = drafts.map(d => `
+  el.innerHTML = filtered.map(d => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
       <div style="min-width:0;overflow:hidden">
         <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
@@ -1017,11 +1022,12 @@ function loadDraftIntoForm(id) {
     const m = draft.measures || {};
     Object.keys(m).forEach(k => {
       if (k === 'suitThreePiece') return;
-      const inputId = 'm-' + k.replace(/_/g, '-');
-      const el = document.getElementById(inputId);
+      const kDash = k.replace(/_/g, '-');
+      // スーツ/ジャージ系はm-プレフィックスなし(例:sj-kata)、標準系はあり(例:m-肩幅)
+      const el = document.getElementById(kDash) || document.getElementById('m-' + kDash);
       if (el && m[k]) el.value = m[k];
     });
-  }, 50);
+  }, 150);
 
   switchTab('measure');
   window.scrollTo(0, 0);
