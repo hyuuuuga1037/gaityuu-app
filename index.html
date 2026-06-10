@@ -658,6 +658,15 @@ function openMeasureForItem(itemId) {
   const item = _inventory.find(i => i.id === itemId);
   if (!item) return;
 
+  // この商品に紐づく下書き（依頼ボタン経由などで既に作成済みの場合）があれば、それを読み込んで続きから編集する
+  const existing = getDrafts().find(d => d.id === itemId);
+  if (existing) {
+    loadDraftIntoForm(itemId);
+    _selectedItemId = itemId;
+    renderSelectedBanner();
+    return;
+  }
+
   // フォームに商品情報をセット
   const mgmtEl = document.getElementById('f-mgmt');
   const brandEl = document.getElementById('f-brand');
@@ -673,7 +682,8 @@ function openMeasureForItem(itemId) {
   const catId = genreMap[item.genre] || '';
   if (catId) selectCat(catId);
 
-  _currentDraftId = null; // 新規下書きとして扱う
+  // この商品専用のIDで下書きを保存できるようにしておく（依頼ボタン経由の下書きとも一致させる）
+  _currentDraftId = itemId;
   renderSelectedBanner();
   switchTab('measure');
   window.scrollTo(0, 0);
@@ -1027,7 +1037,7 @@ function loadDraftIntoForm(id) {
       const el = document.getElementById(kDash) || document.getElementById('m-' + kDash);
       if (el && m[k]) el.value = m[k];
     });
-  }, 150);
+  }, 300);
 
   switchTab('measure');
   window.scrollTo(0, 0);
