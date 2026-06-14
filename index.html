@@ -970,11 +970,34 @@ let _currentDraftId = null;
 
 // Firestore下書き用
 let _drafts = [];
+let _cloudDrafts = []; // クラウドから受信した生データ
+
+// ── 下書きの送信待ちキュー（保存・削除が失敗しても消えない／自動再送）──
+const PD_SAVE_KEY = 'hs-pending-draft-saves';   // { id: draftObject }
+const PD_DEL_KEY  = 'hs-pending-draft-deletes';  // [id, ...]
+function _pdSaves(){ try{ return JSON.parse(localStorage.getItem(PD_SAVE_KEY))||{}; }catch(e){ return {}; } }
+function _setPdSaves(o){ localStorage.setItem(PD_SAVE_KEY, JSON.stringify(o)); }
+function _pdDels(){ try{ return JSON.parse(localStorage.getItem(PD_DEL_KEY))||[]; }catch(e){ return []; } }
+function _setPdDels(a){ localStorage.setItem(PD_DEL_KEY, JSON.stringify(a)); }
+
+// クラウドの下書き ＋ 送信待ち（未確定の保存）を合成し、削除待ちを除外して表示用 _drafts を作る
+function _rebuildDrafts(){
+  const pendingSaves = _pdSaves();
+  const pendingDels = new Set(_pdDels().map(String));
+  const map = new Map();
+  _cloudDrafts.forEach(d => map.set(String(d.id), d));
+  Object.keys(pendingSaves).forEach(id => map.set(String(id), pendingSaves[id])); // 未送信の保存で上書き（消えない）
+  pendingDels.forEach(id => map.delete(id)); // 削除待ちは表示から除外
+  _drafts = [...map.values()].sort((a,b) => (a.savedAt < b.savedAt ? 1 : -1));
+}
+
 function initFirestoreDrafts() {
   db.collection('drafts').orderBy('savedAt','desc').onSnapshot(snap => {
-    _drafts = snap.docs.map(d => d.data());
+    _cloudDrafts = snap.docs.map(d => d.data());
+    _rebuildDrafts();
     renderDraftList();
     renderDraftHistory(); // 「現在は削除済み」表示を最新化
+    _flushPendingDrafts(); // 再接続のたびに未送信分を送り直す
   }, err => {
     console.error('下書き取得エラー:', err);
     showToast('❌ 下書きの取得に失敗しました。通信状況をご確認ください', 5000);
@@ -997,11 +1020,12 @@ function renderDraftList() {
     el.innerHTML = '<div style="color:var(--gray-400);text-align:center;padding:16px;font-size:13px">保存された下書きはありません</div>';
     return;
   }
+  const pendingIds = new Set(Object.keys(_pdSaves()));
   el.innerHTML = filtered.map(d => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
       <div style="min-width:0;overflow:hidden">
         <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
-        <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
@@ -1051,12 +1075,11 @@ function restoreFromHistory(index) {
   const draft = { ...h };
   delete draft._backupAt; delete draft._draftId;
   draft.id = h._draftId; // 元の下書きIDに戻す
-  const idx = _drafts.findIndex(d => d.id === draft.id);
-  if (idx !== -1) _drafts[idx] = draft; else _drafts.unshift(draft);
-  db.collection('drafts').doc(String(draft.id)).set(draft)
-    .then(() => showToast('✅ 下書きを復元しました'))
-    .catch(e => { console.error('復元エラー:', e); showToast('❌ 復元に失敗しました（通信エラー）', 6000); });
+  draft.savedAt = new Date().toISOString(); // 復元時刻で更新（送信待ちのバージョン照合用）
+  saveDraftDoc(draft); // 送信待ち経由で復元（失敗しても消えず自動再送）
+  _rebuildDrafts();
   renderDraftList();
+  showToast('✅ 下書きを復元しました');
 }
 
 function loadDraftIntoForm(id) {
@@ -1119,22 +1142,24 @@ function loadDraftIntoForm(id) {
 
 function deleteDraftConfirm(id) {
   if (!confirm('この下書きを削除しますか？')) return;
-  _drafts = _drafts.filter(d => d.id !== id);
+  // 保存待ちから除去し、削除待ちに登録（送信失敗しても再送し続ける）
+  const ps = _pdSaves(); delete ps[String(id)]; _setPdSaves(ps);
+  const dels = _pdDels(); if (!dels.map(String).includes(String(id))) dels.push(id); _setPdDels(dels);
   if (_currentDraftId === id) _currentDraftId = null;
+  _rebuildDrafts();
   renderDraftList();
-  deleteDraftDoc(id);
+  renderDraftHistory();
+  showToast('🗑️ 下書きを削除しました');
+  _flushPendingDrafts();
 }
 function getDrafts(){ return _drafts; }
 
-// 1件だけを対象に保存・削除する（全件の差分同期は誤削除・誤上書きの原因になるため廃止）
+// 保存：まず送信待ちに記録（=画面から消えない）→ 送信を試みる。失敗しても自動再送。
 function saveDraftDoc(draft) {
-  db.collection('drafts').doc(String(draft.id)).set(draft)
-    .then(() => showToast('💾 下書きを保存しました'))
-    .catch(e => {
-      console.error('下書き保存エラー:', e);
-      showToast('❌ 保存に失敗しました（通信エラー）。再度お試しください', 6000);
-    });
+  const ps = _pdSaves(); ps[String(draft.id)] = draft; _setPdSaves(ps);
+  _setPdDels(_pdDels().filter(x => String(x) !== String(draft.id))); // 削除待ちから外す（保存が優先）
   backupDraft(draft); // 保存のたびに履歴へコピー（削除・上書きされても残る）
+  _flushPendingDrafts();
 }
 
 // 保存時点のコピーを履歴コレクションへ追記（追記専用・削除も上書きもしない）
@@ -1146,13 +1171,43 @@ function backupDraft(draft) {
     .catch(e => console.error('履歴バックアップエラー:', e));
 }
 
-function deleteDraftDoc(id) {
-  db.collection('drafts').doc(String(id)).delete()
-    .then(() => showToast('🗑️ 下書きを削除しました'))
-    .catch(e => {
-      console.error('下書き削除エラー:', e);
-      showToast('❌ 削除に失敗しました（通信エラー）。再度お試しください', 6000);
+let _flushingDrafts = false;
+function _flushPendingDrafts() {
+  // 下書きの保存・削除の送信待ちを処理。成功分だけ外し、失敗分は残して自動再送。
+  if (_flushingDrafts) return;
+  const saves = _pdSaves();
+  const dels = _pdDels();
+  const saveIds = Object.keys(saves);
+  if (!saveIds.length && !dels.length) return;
+  _flushingDrafts = true;
+  const ops = [];
+  saveIds.forEach(id => {
+    const draft = saves[id];
+    ops.push(db.collection('drafts').doc(String(id)).set(draft)
+      .then(() => ({ id, kind: 's', ok: true, ts: draft.savedAt }))
+      .catch(() => ({ id, kind: 's', ok: false })));
+  });
+  dels.forEach(id => {
+    ops.push(db.collection('drafts').doc(String(id)).delete()
+      .then(() => ({ id, kind: 'd', ok: true }))
+      .catch(() => ({ id, kind: 'd', ok: false })));
+  });
+  Promise.all(ops).then(results => {
+    const ps = _pdSaves(); let pdl = _pdDels();
+    results.forEach(r => {
+      if (!r.ok) return;
+      if (r.kind === 's') {
+        if (ps[r.id] && ps[r.id].savedAt === r.ts) delete ps[r.id]; // 送信後に新しい保存が無ければ完了
+      } else {
+        pdl = pdl.filter(x => String(x) !== String(r.id));
+      }
     });
+    _setPdSaves(ps); _setPdDels(pdl);
+    _flushingDrafts = false;
+    _rebuildDrafts(); renderDraftList();
+    const remaining = Object.keys(ps).length + pdl.length;
+    if (remaining) setTimeout(_flushPendingDrafts, 8000); // 未送信分は自動再送
+  }).catch(() => { _flushingDrafts = false; setTimeout(_flushPendingDrafts, 8000); });
 }
 
 function initMeasureForm() {
@@ -1191,6 +1246,13 @@ function initMeasureForm() {
   });
   initFirestoreDrafts();
   initDraftHistory(); // 管理者のみバックアップ履歴を購読
+  // 下書きの送信待ちを定期的に自動再送（通信不良・上限超過でも放置で必ず送られる）。タイマーは一度だけ設定。
+  if (!window._draftFlushTimerSet) {
+    window._draftFlushTimerSet = true;
+    setTimeout(_flushPendingDrafts, 3000);
+    setInterval(_flushPendingDrafts, 20000);
+    window.addEventListener('online', _flushPendingDrafts);
+  }
 }
 
 function selectCat(id){
@@ -1507,10 +1569,10 @@ function saveDraft(){
   if(!data.name&&!data.brand){showToast('⚠️ 商品名またはブランド名を入力してください');return;}
   if(_currentDraftId===null) _currentDraftId=Date.now();
   const draft={id:_currentDraftId,...data};
-  const idx=_drafts.findIndex(d=>d.id===_currentDraftId);
-  if(idx!==-1) _drafts[idx]=draft; else _drafts.unshift(draft);
-  saveDraftDoc(draft);
+  saveDraftDoc(draft);   // 送信待ちに記録＋送信試行（失敗しても消えない）
+  _rebuildDrafts();      // クラウド＋送信待ちを合成して一覧を最新化
   renderDraftList();
+  showToast('💾 下書きを保存しました');
 }
 
 function resetMeasureForm(){
