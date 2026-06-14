@@ -294,6 +294,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sec-ttl">📂 保存済み下書き（<span id="draft-count">0</span>件）</div>
       <div id="draft-list"></div>
     </div>
+    <!-- バックアップ履歴（管理者のみ・復元用） -->
+    <div class="card" id="draft-history-card" style="display:none">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;color:var(--primary)">🗂 バックアップ履歴（復元用）</summary>
+        <div style="font-size:11px;color:var(--gray-400);margin:6px 0 10px">削除・上書きした下書きも、保存時点のコピーがここに残ります。必要なものを復元できます。</div>
+        <div id="draft-history-list"></div>
+      </details>
+    </div>
     <!-- カテゴリ -->
     <div class="card">
       <div class="sec-ttl">カテゴリ</div>
@@ -564,7 +572,7 @@ function renderCurrentTab() {
   if (!currentUser) return;
   switch(currentTab) {
     case 'items':          renderItems(); break;
-    case 'measure':        renderSelectedBanner(); renderDraftList(); break;
+    case 'measure':        renderSelectedBanner(); renderDraftList(); renderDraftHistory(); break;
     case 'summary':        renderSummary(); break;
     case 'admin-items':    renderAdminItems(); break;
     case 'admin-summary':  renderAdminSummary(); break;
@@ -962,15 +970,14 @@ let _currentDraftId = null;
 
 // Firestore下書き用
 let _drafts = [];
-let _draftIds = new Set();
 function initFirestoreDrafts() {
   db.collection('drafts').orderBy('savedAt','desc').onSnapshot(snap => {
     _drafts = snap.docs.map(d => d.data());
-    _draftIds = new Set(snap.docs.map(d => d.id));
     renderDraftList();
+    renderDraftHistory(); // 「現在は削除済み」表示を最新化
   }, err => {
-    _drafts = JSON.parse(localStorage.getItem('hs-drafts')||'[]');
-    renderDraftList();
+    console.error('下書き取得エラー:', err);
+    showToast('❌ 下書きの取得に失敗しました。通信状況をご確認ください', 5000);
   });
 }
 
@@ -1001,6 +1008,55 @@ function renderDraftList() {
         <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
       </div>
     </div>`).join('');
+}
+
+/* ===== バックアップ履歴（管理者のみ・復元用） ===== */
+let _draftHistory = [];
+function initDraftHistory() {
+  if (currentUser !== 'admin') return; // 管理者のみ
+  db.collection('drafts_history').orderBy('_backupAt','desc').limit(100).onSnapshot(snap => {
+    _draftHistory = snap.docs.map(d => d.data());
+    renderDraftHistory();
+  }, err => console.error('履歴取得エラー:', err));
+}
+
+function renderDraftHistory() {
+  const card = document.getElementById('draft-history-card');
+  const el = document.getElementById('draft-history-list');
+  if (!card || !el) return;
+  card.style.display = (currentUser === 'admin') ? 'block' : 'none';
+  if (currentUser !== 'admin') return;
+  if (!_draftHistory.length) {
+    el.innerHTML = '<div style="color:var(--gray-400);text-align:center;padding:12px;font-size:13px">履歴はまだありません</div>';
+    return;
+  }
+  const liveIds = new Set(getDrafts().map(d => String(d.id)));
+  el.innerHTML = _draftHistory.map((h,i) => {
+    const exists = liveIds.has(String(h._draftId));
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="min-width:0;overflow:hidden">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.mgmt ? 'No.'+h.mgmt+' ' : ''}${h.brand||''} ${h.name||''}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${h._backupAt ? new Date(h._backupAt).toLocaleString('ja-JP') : ''}${exists ? '' : ' ／ <span style="color:var(--danger)">現在は削除済み</span>'}</div>
+      </div>
+      <button class="btn btn-outline-primary btn-sm" style="flex-shrink:0" onclick="restoreFromHistory(${i})">復元</button>
+    </div>`;
+  }).join('');
+}
+
+function restoreFromHistory(index) {
+  const h = _draftHistory[index];
+  if (!h) return;
+  if (!confirm(`この時点の内容で下書きを復元しますか？\n${h.mgmt ? 'No.'+h.mgmt+' ' : ''}${h.brand||''} ${h.name||''}\n（${h._backupAt ? new Date(h._backupAt).toLocaleString('ja-JP') : ''}時点）`)) return;
+  const draft = { ...h };
+  delete draft._backupAt; delete draft._draftId;
+  draft.id = h._draftId; // 元の下書きIDに戻す
+  const idx = _drafts.findIndex(d => d.id === draft.id);
+  if (idx !== -1) _drafts[idx] = draft; else _drafts.unshift(draft);
+  db.collection('drafts').doc(String(draft.id)).set(draft)
+    .then(() => showToast('✅ 下書きを復元しました'))
+    .catch(e => { console.error('復元エラー:', e); showToast('❌ 復元に失敗しました（通信エラー）', 6000); });
+  renderDraftList();
 }
 
 function loadDraftIntoForm(id) {
@@ -1063,23 +1119,40 @@ function loadDraftIntoForm(id) {
 
 function deleteDraftConfirm(id) {
   if (!confirm('この下書きを削除しますか？')) return;
-  const drafts = getDrafts().filter(d => d.id !== id);
-  putDrafts(drafts);
+  _drafts = _drafts.filter(d => d.id !== id);
   if (_currentDraftId === id) _currentDraftId = null;
   renderDraftList();
-  showToast('🗑️ 下書きを削除しました');
+  deleteDraftDoc(id);
 }
 function getDrafts(){ return _drafts; }
-function putDrafts(d){
-  _drafts = d;
-  const batch = db.batch();
-  const colRef = db.collection('drafts');
-  const newIds = new Set(d.map(item=>String(item.id)));
-  _draftIds.forEach(id=>{ if(!newIds.has(id)) batch.delete(colRef.doc(id)); });
-  d.forEach(item=>batch.set(colRef.doc(String(item.id)),item));
-  batch.commit().then(()=>{ _draftIds=newIds; }).catch(()=>{
-    localStorage.setItem('hs-drafts',JSON.stringify(d));
-  });
+
+// 1件だけを対象に保存・削除する（全件の差分同期は誤削除・誤上書きの原因になるため廃止）
+function saveDraftDoc(draft) {
+  db.collection('drafts').doc(String(draft.id)).set(draft)
+    .then(() => showToast('💾 下書きを保存しました'))
+    .catch(e => {
+      console.error('下書き保存エラー:', e);
+      showToast('❌ 保存に失敗しました（通信エラー）。再度お試しください', 6000);
+    });
+  backupDraft(draft); // 保存のたびに履歴へコピー（削除・上書きされても残る）
+}
+
+// 保存時点のコピーを履歴コレクションへ追記（追記専用・削除も上書きもしない）
+function backupDraft(draft) {
+  const at = Date.now();
+  const histId = String(draft.id) + '_' + at;
+  db.collection('drafts_history').doc(histId)
+    .set({ ...draft, _backupAt: new Date(at).toISOString(), _draftId: draft.id })
+    .catch(e => console.error('履歴バックアップエラー:', e));
+}
+
+function deleteDraftDoc(id) {
+  db.collection('drafts').doc(String(id)).delete()
+    .then(() => showToast('🗑️ 下書きを削除しました'))
+    .catch(e => {
+      console.error('下書き削除エラー:', e);
+      showToast('❌ 削除に失敗しました（通信エラー）。再度お試しください', 6000);
+    });
 }
 
 function initMeasureForm() {
@@ -1117,6 +1190,7 @@ function initMeasureForm() {
     sl.appendChild(d);
   });
   initFirestoreDrafts();
+  initDraftHistory(); // 管理者のみバックアップ履歴を購読
 }
 
 function selectCat(id){
@@ -1431,18 +1505,11 @@ function collectMeasures(){
 function saveDraft(){
   const data=collectFormData();
   if(!data.name&&!data.brand){showToast('⚠️ 商品名またはブランド名を入力してください');return;}
-  const drafts=getDrafts();
-  if(_currentDraftId!==null){
-    const idx=drafts.findIndex(d=>d.id===_currentDraftId);
-    if(idx!==-1) drafts[idx]={id:_currentDraftId,...data};
-    else drafts.unshift({id:_currentDraftId,...data});
-    showToast('💾 下書きを上書き保存しました');
-  } else {
-    _currentDraftId=Date.now();
-    drafts.unshift({id:_currentDraftId,...data});
-    showToast('💾 下書きを保存しました');
-  }
-  putDrafts(drafts);
+  if(_currentDraftId===null) _currentDraftId=Date.now();
+  const draft={id:_currentDraftId,...data};
+  const idx=_drafts.findIndex(d=>d.id===_currentDraftId);
+  if(idx!==-1) _drafts[idx]=draft; else _drafts.unshift(draft);
+  saveDraftDoc(draft);
   renderDraftList();
 }
 
