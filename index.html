@@ -283,7 +283,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- 📦 担当商品 -->
   <div class="panel on" id="panel-items">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" id="item-search" placeholder="🔍 管理番号・ブランドで検索" oninput="onItemSearch(this.value)"
+        style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
+      <button class="btn btn-outline btn-sm" id="item-sort-btn" onclick="toggleItemSort()" style="flex-shrink:0;white-space:nowrap">No.↑</button>
+    </div>
     <div id="items-list"></div>
+    <div id="packed-section" style="margin-top:14px;display:none">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;color:var(--primary);font-size:14px">✅ 発送済み（取り消せます）<span id="packed-count" style="color:var(--gray-400);font-weight:400"></span></summary>
+        <div style="font-size:11px;color:var(--gray-400);margin:6px 0 8px">間違えてチェックした場合は「戻す」でリストに戻せます（直近14日分）。</div>
+        <div id="packed-list"></div>
+      </details>
+    </div>
   </div>
 
   <!-- 📋 採寸・説明文 -->
@@ -476,6 +488,7 @@ function confirmAdminLogin() {
 function logout() {
   currentUser = null;
   _selectedItemId = null;
+  resetMeasureForm(true); // ログアウト時もフォームを白紙化（次のユーザーに入力・編集中IDを残さない）
   document.getElementById('app').classList.remove('open');
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -513,6 +526,7 @@ function startApp() {
 
   initData();
   initMeasureForm(); // 採寸フォームは管理者・外注スタッフ共通で使用
+  resetMeasureForm(true); // ログインのたびにフォームを白紙化（前のユーザーの入力・編集中IDを引き継がない）
 }
 
 /* ===== STATE ===== */
@@ -581,38 +595,88 @@ function renderCurrentTab() {
 }
 
 /* ===== 担当商品 ===== */
+let _itemSearch = '';
+let _itemSortAsc = true; // true:番号昇順 / false:降順
+
+function onItemSearch(v) { _itemSearch = (v||'').trim().toLowerCase(); renderItems(); }
+function toggleItemSort() {
+  _itemSortAsc = !_itemSortAsc;
+  const btn = document.getElementById('item-sort-btn');
+  if (btn) btn.textContent = _itemSortAsc ? 'No.↑' : 'No.↓';
+  renderItems();
+}
+
 function myAssigneeKey() { return currentUser; }
-function myItems() {
+function _assignedToMe(i) {
   const legacyKey = currentUser === '奥村' ? 'A' : 'B';
+  const assignee = _assignees[String(i.id)] || i.assignee || '';
+  return assignee === currentUser || assignee === legacyKey;
+}
+function _packedByMe(itemId) {
+  return _workRecords.some(r => r.itemId === itemId && r.type === 'pack' && r.assignee === currentUser);
+}
+// 担当商品リスト：自分の担当で、まだ梱包発送チェックしていないもの。
+// （売却ステータスとは無関係＝私が先に売却処理しても消えない。梱包チェックで初めて消える）
+function myItems() {
+  const q = _itemSearch;
+  const soldCutoff = Date.now() - 45*24*60*60*1000; // 売却済みは直近45日のみ表示（古い在庫の流入防止）
   return _inventory
     .filter(i => {
-      // assigneesコレクションのデータを優先、なければitemのassigneeフィールドを参照
-      const assignee = _assignees[String(i.id)] || i.assignee || '';
-      return (assignee === currentUser || assignee === legacyKey) && i.status !== 'sold';
+      if (!_assignedToMe(i)) return false;
+      if (_packedByMe(i.id)) return false; // 発送済みは通常リストから外す
+      // 売却済みは「最近売れて、まだ発送チェックしていないもの」だけ残す
+      if (i.status === 'sold') {
+        const t = i.saleDate ? Date.parse(i.saleDate) : 0;
+        if (!(t >= soldCutoff)) return false;
+      }
+      if (!q) return true;
+      // 管理番号・ブランド・商品詳細で絞り込み
+      return [i.no, i.brand, i.details].some(v => String(v||'').toLowerCase().includes(q));
     })
-    .sort((a,b) => (a.no||0) - (b.no||0));
+    .sort((a,b) => _itemSortAsc ? (a.no||0)-(b.no||0) : (b.no||0)-(a.no||0));
+}
+// 発送済み（取り消し用）：直近14日以内に梱包発送チェックしたもの
+function myPackedItems() {
+  const cutoff = Date.now() - 14*24*60*60*1000;
+  const recOf = i => _workRecords.find(r => r.itemId === i.id && r.type === 'pack' && r.assignee === currentUser);
+  return _inventory
+    .filter(i => {
+      if (!_assignedToMe(i)) return false;
+      const rec = recOf(i);
+      if (!rec) return false;
+      const t = rec.createdAt ? Date.parse(rec.createdAt) : 0;
+      return t >= cutoff;
+    })
+    .sort((a,b) => {
+      const ta = (recOf(a) && recOf(a).createdAt) ? Date.parse(recOf(a).createdAt) : 0;
+      const tb = (recOf(b) && recOf(b).createdAt) ? Date.parse(recOf(b).createdAt) : 0;
+      return tb - ta;
+    });
 }
 
 function renderItems() {
   const el = document.getElementById('items-list');
   const items = myItems();
+  renderPackedItems(); // 「発送済み（取り消せます）」セクションも更新
   if (!items.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>担当商品はありません</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>${_itemSearch ? '該当する商品はありません' : '担当商品はありません'}</p></div>`;
     return;
   }
   el.innerHTML = items.map(item => {
     const hasShoot = _workRecords.some(r => r.itemId === item.id && r.type === 'shoot' && r.assignee === currentUser);
     const hasPack  = _workRecords.some(r => r.itemId === item.id && r.type === 'pack'  && r.assignee === currentUser);
-    const stLabel  = {unlisted:'未出品', listed:'出品中'}[item.status||'unlisted'];
+    const isSold = item.status === 'sold';
+    const stLabel  = {unlisted:'未出品', listed:'出品中', sold:'売却済→要発送'}[item.status||'unlisted'];
     const stClass  = item.status === 'listed' ? 'badge-listed' : 'badge-unlisted';
+    const badgeStyle = isSold ? 'background:#FEF3C7;color:#B45309;border:1px solid #F59E0B' : '';
     return `
-    <div class="item-card">
+    <div class="item-card"${isSold?' style="border-color:#F59E0B"':''}>
       <div class="item-top">
         <div style="flex:1">
           <div style="font-size:18px;font-weight:800;color:var(--primary);letter-spacing:1px;margin-bottom:2px">No.${item.no||'-'}</div>
           <div style="font-size:14px;font-weight:700">${item.brand||'-'}${item.details?' / '+item.details:''}</div>
         </div>
-        <span class="badge ${stClass}">${stLabel}</span>
+        <span class="badge ${stClass}" style="${badgeStyle}">${stLabel}</span>
       </div>
       <div class="item-meta" style="margin-top:4px">${item.genre||''}${item.size?'　サイズ：'+item.size:''}</div>
       <div class="item-checks">
@@ -628,6 +692,35 @@ function renderItems() {
       <button class="btn btn-outline-primary btn-sm" onclick="openMeasureForItem(${item.id})">📋 採寸・説明文を入力</button>
     </div>`;
   }).join('');
+}
+
+// 発送済み（取り消せます）セクション
+function renderPackedItems() {
+  const sec = document.getElementById('packed-section');
+  const list = document.getElementById('packed-list');
+  const cnt = document.getElementById('packed-count');
+  if (!sec || !list) return;
+  const items = myPackedItems();
+  if (!items.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  if (cnt) cnt.textContent = '（' + items.length + '件）';
+  list.innerHTML = items.map(item => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="min-width:0;overflow:hidden">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">No.${item.no||'-'} ${item.brand||''}${item.details?' / '+item.details:''}</div>
+      </div>
+      <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick="undoPack(${item.id})">↩️ 戻す</button>
+    </div>`).join('');
+}
+
+async function undoPack(itemId) {
+  const record = _workRecords.find(r => r.itemId === itemId && r.type === 'pack' && r.assignee === currentUser);
+  if (!record) return;
+  if (!confirm('梱包発送のチェックを取り消して、リストに戻しますか？')) return;
+  try {
+    await db.collection('work_records').doc(record.fsId).delete();
+    showToast('↩️ リストに戻しました');
+  } catch(err) { showToast('❌ 失敗しました'); }
 }
 
 async function toggleWork(e, itemId, type, isDone) {
@@ -1572,10 +1665,12 @@ function saveDraft(){
   saveDraftDoc(draft);   // 送信待ちに記録＋送信試行（失敗しても消えない）
   _rebuildDrafts();      // クラウド＋送信待ちを合成して一覧を最新化
   renderDraftList();
+  // 保存後は「新規」状態に戻す。次に別商品を入力・保存しても前の下書きを上書きしない。
+  _currentDraftId=null;
   showToast('💾 下書きを保存しました');
 }
 
-function resetMeasureForm(){
+function resetMeasureForm(silent){
   ['f-mgmt','f-name','f-brand','f-size','f-appeal','f-tags','f-price'].forEach(id=>{
     const el=document.getElementById(id);if(el) el.value='';
   });
@@ -1589,8 +1684,8 @@ function resetMeasureForm(){
   suitType='setup';hemType='single';
   suitDesign={lining:'',buttons:'',vent:'',options:[]};
   jerseyType='setup';suitThreePiece=false;
-  genText='';_currentDraftId=null;
-  showToast('🔄 リセットしました');
+  genText='';_currentDraftId=null;_selectedItemId=null;
+  if(!silent) showToast('🔄 リセットしました');
 }
 
 /* ===== TOAST ===== */
