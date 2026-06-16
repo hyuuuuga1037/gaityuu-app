@@ -404,6 +404,32 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- 管理者：外注費集計 -->
   <div class="panel" id="panel-admin-summary" style="display:none">
+    <div class="card">
+      <div class="card-title">✨ 特別費用を追加（研修費・手当など）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <div>
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:3px">対象者</div>
+          <select id="ec-person" style="padding:8px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
+            <option value="奥村">奥村さん</option>
+            <option value="相川">相川さん</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:3px">月</div>
+          <input type="month" id="ec-month" style="padding:8px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:3px">項目名</div>
+          <input type="text" id="ec-label" placeholder="例：研修費" style="width:100%;padding:8px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:3px">金額</div>
+          <input type="number" id="ec-amount" placeholder="0" min="0" step="100" style="width:100px;padding:8px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addExtraCharge()" style="height:38px">＋ 追加</button>
+      </div>
+      <div id="extra-charges-list" style="margin-top:12px"></div>
+    </div>
     <div id="admin-summary-content"></div>
   </div>
 
@@ -535,7 +561,12 @@ let _inventory = [];
 let _assignees = {}; // { itemId: assignee } 担当者データ専用
 let _workRecords = [];
 let _rates = null;
+let _extraCharges = []; // 特別費用（研修費など・対象者/月/項目名/金額）
 let _selectedItemId = null; // 採寸タブで選択中の商品ID
+
+function extraChargesFor(person, month) {
+  return _extraCharges.filter(c => c.person === person && c.month === month);
+}
 
 /* ===== DATA ===== */
 function initData() {
@@ -563,6 +594,11 @@ function initData() {
     _rates = snap.exists ? snap.data() : defaultRates();
     renderCurrentTab();
   });
+  // 特別費用（研修費など）
+  db.collection('extra_charges').onSnapshot(snap => {
+    _extraCharges = snap.docs.map(d => ({ fsId: d.id, ...d.data() }));
+    renderCurrentTab();
+  }, () => {});
 }
 
 function defaultRates() {
@@ -589,7 +625,7 @@ function renderCurrentTab() {
     case 'measure':        renderSelectedBanner(); renderDraftList(); renderDraftHistory(); break;
     case 'summary':        renderSummary(); break;
     case 'admin-items':    renderAdminItems(); break;
-    case 'admin-summary':  renderAdminSummary(); break;
+    case 'admin-summary':  renderAdminSummary(); renderExtraChargesList(); break;
     case 'admin-settings': renderAdminSettings(); break;
   }
 }
@@ -819,7 +855,10 @@ function renderSummary() {
     if (!byMonth[m]) byMonth[m] = [];
     byMonth[m].push(r);
   });
-  const months = Object.keys(byMonth).sort().reverse();
+  // 作業記録のない月でも特別費用があれば表示する
+  const monthsSet = new Set(Object.keys(byMonth));
+  _extraCharges.filter(c => c.person === currentUser).forEach(c => { if (c.month) monthsSet.add(c.month); });
+  const months = [...monthsSet].sort().reverse();
   if (!months.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><p>作業記録がありません</p></div>`;
     return;
@@ -833,12 +872,14 @@ function renderSummary() {
   _inventory.forEach(i => { itemMap[i.id] = i; });
 
   el.innerHTML = months.map(month => {
-    const recs = byMonth[month];
+    const recs = byMonth[month] || [];
     const shootRecs = recs.filter(r => r.type==='shoot');
     const packRecs  = recs.filter(r => r.type==='pack');
     const shootTotal = shootRecs.reduce((s,r) => s+(r.unitPrice||0), 0);
     const packTotal  = packRecs.reduce((s,r)  => s+(r.unitPrice||0), 0);
-    const grandTotal = shootTotal + packTotal + (spaceEnabled ? spaceAmount : 0);
+    const extras = extraChargesFor(currentUser, month);
+    const extraTotal = extras.reduce((s,c) => s+(c.amount||0), 0);
+    const grandTotal = shootTotal + packTotal + (spaceEnabled ? spaceAmount : 0) + extraTotal;
     const [y,m] = month.split('-');
 
     const detailRows = recs.slice().sort((a,b) => (a.date < b.date ? 1 : -1)).map(r => {
@@ -856,6 +897,7 @@ function renderSummary() {
       <div class="month-row"><span>📷 撮影採寸（${shootRecs.length}件）</span><span>¥${shootTotal.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${packRecs.length}件）</span><span>¥${packTotal.toLocaleString()}</span></div>
       ${spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${spaceAmount.toLocaleString()}</span></div>` : ''}
+      ${extras.map(c => `<div class="month-row"><span>✨ ${c.label}</span><span>¥${(c.amount||0).toLocaleString()}</span></div>`).join('')}
       <div class="month-row total"><span>合計</span><span>¥${grandTotal.toLocaleString()}</span></div>
       <details style="margin-top:8px">
         <summary style="cursor:pointer;font-size:12px;color:var(--primary)">明細を見る（${recs.length}件）</summary>
@@ -913,38 +955,91 @@ function renderAdminSummary() {
     if (!byMonth[m]) byMonth[m] = [];
     byMonth[m].push(r);
   });
-  const months = Object.keys(byMonth).sort().reverse();
+  // 作業記録のない月でも特別費用があれば表示
+  const monthsSet = new Set(Object.keys(byMonth));
+  _extraCharges.forEach(c => { if (c.month) monthsSet.add(c.month); });
+  const months = [...monthsSet].sort().reverse();
   if (!months.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><p>作業記録がありません</p></div>`; return; }
   el.innerHTML = months.map(month => {
-    const recs = byMonth[month];
+    const recs = byMonth[month] || [];
     const [y,m] = month.split('-');
     const calcPerson = (name) => {
       const pr = recs.filter(r => r.assignee===name);
       const shoot = pr.filter(r=>r.type==='shoot').reduce((s,r)=>s+(r.unitPrice||0),0);
       const pack  = pr.filter(r=>r.type==='pack' ).reduce((s,r)=>s+(r.unitPrice||0),0);
-      return { shoot, pack, total: shoot+pack,
+      const extras = extraChargesFor(name, month);
+      const extraTotal = extras.reduce((s,c)=>s+(c.amount||0),0);
+      return { shoot, pack, extras, extraTotal, total: shoot+pack+extraTotal,
         shootCnt: pr.filter(r=>r.type==='shoot').length,
         packCnt:  pr.filter(r=>r.type==='pack').length };
     };
     const ok = calcPerson('奥村');
     const ai = calcPerson('相川');
     const grand = ok.total + ai.total;
+    const extraRows = (p) => p.extras.map(c => `<div class="month-row"><span>✨ ${c.label}</span><span>¥${(c.amount||0).toLocaleString()}</span></div>`).join('');
     return `
     <div class="card">
       <div style="font-size:15px;font-weight:700;margin-bottom:12px">${y}年${parseInt(m)}月</div>
       <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">奥村さん</div>
       <div class="month-row"><span>📷 撮影採寸（${ok.shootCnt}件）</span><span>¥${ok.shoot.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${ok.packCnt}件）</span><span>¥${ok.pack.toLocaleString()}</span></div>
+      ${extraRows(ok)}
       <div class="month-row" style="font-weight:700"><span>奥村さん計</span><span>¥${ok.total.toLocaleString()}</span></div>
       <div style="height:1px;background:var(--gray-200);margin:10px 0"></div>
       <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">相川さん</div>
       <div class="month-row"><span>📷 撮影採寸（${ai.shootCnt}件）</span><span>¥${ai.shoot.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${ai.packCnt}件）</span><span>¥${ai.pack.toLocaleString()}</span></div>
+      ${extraRows(ai)}
       <div class="month-row" style="font-weight:700"><span>相川さん計</span><span>¥${ai.total.toLocaleString()}</span></div>
       <div style="height:2px;background:var(--primary);margin:10px 0"></div>
       <div class="month-row" style="font-size:15px;font-weight:700"><span>外注費合計</span><span style="color:var(--primary)">¥${grand.toLocaleString()}</span></div>
     </div>`;
   }).join('');
+}
+
+/* ===== 管理者：特別費用 ===== */
+function addExtraCharge() {
+  const person = document.getElementById('ec-person').value;
+  const month  = document.getElementById('ec-month').value;
+  const label  = document.getElementById('ec-label').value.trim();
+  const amount = parseInt(document.getElementById('ec-amount').value) || 0;
+  if (!month || !label || !amount) { showToast('⚠️ 月・項目名・金額を入力してください'); return; }
+  const id = Date.now();
+  db.collection('extra_charges').doc(String(id))
+    .set({ id, person, month, label, amount, createdAt: new Date().toISOString() })
+    .then(() => {
+      showToast('✅ 特別費用を追加しました');
+      document.getElementById('ec-label').value = '';
+      document.getElementById('ec-amount').value = '';
+    })
+    .catch(e => { console.error('特別費用の追加エラー:', e); showToast('❌ 追加に失敗しました（通信エラー）', 6000); });
+}
+
+function deleteExtraCharge(fsId) {
+  if (!confirm('この特別費用を削除しますか？')) return;
+  db.collection('extra_charges').doc(fsId).delete()
+    .then(() => showToast('🗑️ 削除しました'))
+    .catch(e => { console.error('特別費用の削除エラー:', e); showToast('❌ 削除に失敗しました（通信エラー）', 6000); });
+}
+
+function renderExtraChargesList() {
+  const el = document.getElementById('extra-charges-list');
+  if (!el) return;
+  const monthEl = document.getElementById('ec-month');
+  if (monthEl && !monthEl.value) monthEl.value = new Date().toISOString().slice(0,7); // 当月を初期値に
+  const list = _extraCharges.slice().sort((a,b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : 0));
+  if (!list.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:4px 0">登録された特別費用はありません</div>';
+    return;
+  }
+  el.innerHTML = list.map(c => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="min-width:0;overflow:hidden">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">✨ ${c.label} <span style="color:var(--primary)">¥${(c.amount||0).toLocaleString()}</span></div>
+        <div style="font-size:11px;color:var(--gray-400)">${c.person}さん／${c.month}</div>
+      </div>
+      <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick="deleteExtraCharge('${c.fsId}')">削除</button>
+    </div>`).join('');
 }
 
 /* ===== 管理者：単価設定 ===== */
