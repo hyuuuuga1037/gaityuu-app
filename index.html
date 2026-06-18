@@ -559,6 +559,7 @@ function startApp() {
 let currentTab = 'items';
 let _inventory = [];
 let _assignees = {}; // { itemId: assignee } 担当者データ専用
+let _assigneeDates = {}; // { itemId: updatedAt(ms) } 振り分けた日時
 let _workRecords = [];
 let _rates = null;
 let _extraCharges = []; // 特別費用（研修費など・対象者/月/項目名/金額）
@@ -578,9 +579,11 @@ function initData() {
   // 担当者データ（専用コレクションから）
   db.collection('assignees').onSnapshot(snap => {
     _assignees = {};
+    _assigneeDates = {};
     snap.docs.forEach(doc => {
       const d = doc.data();
       _assignees[String(d.id)] = d.assignee;
+      if (d.updatedAt) _assigneeDates[String(d.id)] = d.updatedAt; // 振り分け日時
     });
     renderCurrentTab();
   });
@@ -651,6 +654,13 @@ function _assignedToMe(i) {
 function _packedByMe(itemId) {
   return _workRecords.some(r => r.itemId === itemId && r.type === 'pack' && r.assignee === currentUser);
 }
+// 振り分け日ラベル（例:「　振分：6/18」）。日時データが無い古い担当分は空文字。
+function assignDateLabel(itemId) {
+  const ts = _assigneeDates[String(itemId)];
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `　振分：${d.getMonth()+1}/${d.getDate()}`;
+}
 // 担当商品リスト：自分の担当で、まだ梱包発送チェックしていないもの。
 // （売却ステータスとは無関係＝私が先に売却処理しても消えない。梱包チェックで初めて消える）
 function myItems() {
@@ -714,7 +724,7 @@ function renderItems() {
         </div>
         <span class="badge ${stClass}" style="${badgeStyle}">${stLabel}</span>
       </div>
-      <div class="item-meta" style="margin-top:4px">${item.genre||''}${item.size?'　サイズ：'+item.size:''}</div>
+      <div class="item-meta" style="margin-top:4px">${item.genre||''}${item.size?'　サイズ：'+item.size:''}${assignDateLabel(item.id)}</div>
       <div class="item-checks">
         <label class="check-row" onclick="toggleWork(event,${item.id},'shoot',${hasShoot})">
           <input type="checkbox" ${hasShoot?'checked':''} readonly>
@@ -932,7 +942,7 @@ function renderAdminItems() {
     <div class="item-card">
       <div class="item-top">
         <div>
-          <div class="item-no">No.${item.no||'-'}　担当：${assigneeLabel}</div>
+          <div class="item-no">No.${item.no||'-'}　担当：${assigneeLabel}${assignDateLabel(item.id)}</div>
           <div class="item-brand">${item.brand||'-'}</div>
         </div>
         <span class="badge ${stClass}">${stLabel}</span>
@@ -963,13 +973,17 @@ function renderAdminSummary() {
   el.innerHTML = months.map(month => {
     const recs = byMonth[month] || [];
     const [y,m] = month.split('-');
+    const rates = _rates || defaultRates();
     const calcPerson = (name) => {
       const pr = recs.filter(r => r.assignee===name);
       const shoot = pr.filter(r=>r.type==='shoot').reduce((s,r)=>s+(r.unitPrice||0),0);
       const pack  = pr.filter(r=>r.type==='pack' ).reduce((s,r)=>s+(r.unitPrice||0),0);
+      const ur = rates[name] || {};
+      const space = ur.spaceEnabled ? (ur.spaceAmount || 0) : 0;
       const extras = extraChargesFor(name, month);
       const extraTotal = extras.reduce((s,c)=>s+(c.amount||0),0);
-      return { shoot, pack, extras, extraTotal, total: shoot+pack+extraTotal,
+      return { shoot, pack, space, spaceEnabled: !!ur.spaceEnabled, extras, extraTotal,
+        total: shoot+pack+space+extraTotal,
         shootCnt: pr.filter(r=>r.type==='shoot').length,
         packCnt:  pr.filter(r=>r.type==='pack').length };
     };
@@ -977,18 +991,21 @@ function renderAdminSummary() {
     const ai = calcPerson('相川');
     const grand = ok.total + ai.total;
     const extraRows = (p) => p.extras.map(c => `<div class="month-row"><span>✨ ${c.label}</span><span>¥${(c.amount||0).toLocaleString()}</span></div>`).join('');
+    const spaceRow = (p) => p.spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${p.space.toLocaleString()}</span></div>` : '';
     return `
     <div class="card">
       <div style="font-size:15px;font-weight:700;margin-bottom:12px">${y}年${parseInt(m)}月</div>
       <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">奥村さん</div>
       <div class="month-row"><span>📷 撮影採寸（${ok.shootCnt}件）</span><span>¥${ok.shoot.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${ok.packCnt}件）</span><span>¥${ok.pack.toLocaleString()}</span></div>
+      ${spaceRow(ok)}
       ${extraRows(ok)}
       <div class="month-row" style="font-weight:700"><span>奥村さん計</span><span>¥${ok.total.toLocaleString()}</span></div>
       <div style="height:1px;background:var(--gray-200);margin:10px 0"></div>
       <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">相川さん</div>
       <div class="month-row"><span>📷 撮影採寸（${ai.shootCnt}件）</span><span>¥${ai.shoot.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${ai.packCnt}件）</span><span>¥${ai.pack.toLocaleString()}</span></div>
+      ${spaceRow(ai)}
       ${extraRows(ai)}
       <div class="month-row" style="font-weight:700"><span>相川さん計</span><span>¥${ai.total.toLocaleString()}</span></div>
       <div style="height:2px;background:var(--primary);margin:10px 0"></div>
