@@ -1217,9 +1217,11 @@ function renderDraftList() {
   const drafts = getDrafts();
   // 担当者でフィルタリング（管理者は全件表示、外注スタッフは自分宛のみ）
   const legacyKey = currentUser === '奥村' ? 'A' : 'B';
-  const filtered = currentUser === 'admin' ? drafts : drafts.filter(d =>
-    !d.fromRequest || !d.assignee || d.assignee === currentUser || d.assignee === legacyKey
-  );
+  // 外注スタッフには「自分宛の撮影採寸依頼」＋「自分が作成した下書き」だけ表示（管理者は全件）
+  const filtered = currentUser === 'admin' ? drafts : drafts.filter(d => {
+    if (d.fromRequest) return d.assignee === currentUser || d.assignee === legacyKey;
+    return d.createdBy === currentUser;
+  });
   if (cntEl) cntEl.textContent = filtered.length;
   if (!filtered.length) {
     el.innerHTML = '<div style="color:var(--gray-400);text-align:center;padding:16px;font-size:13px">保存された下書きはありません</div>';
@@ -1773,7 +1775,9 @@ function saveDraft(){
   const data=collectFormData();
   if(!data.name&&!data.brand){showToast('⚠️ 商品名またはブランド名を入力してください');return;}
   if(_currentDraftId===null) _currentDraftId=Date.now();
-  const draft={id:_currentDraftId,...data};
+  // 既存の下書き情報（依頼フラグ・担当者・作成者）を保持しつつ、フォーム内容で更新
+  const existing = _drafts.find(d => d.id === _currentDraftId) || {};
+  const draft = { ...existing, id:_currentDraftId, ...data, createdBy: existing.createdBy || currentUser };
   saveDraftDoc(draft);   // 送信待ちに記録＋送信試行（失敗しても消えない）
   _rebuildDrafts();      // クラウド＋送信待ちを合成して一覧を最新化
   renderDraftList();
