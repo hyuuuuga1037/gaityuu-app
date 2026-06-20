@@ -1217,10 +1217,12 @@ function renderDraftList() {
   const drafts = getDrafts();
   // 担当者でフィルタリング（管理者は全件表示、外注スタッフは自分宛のみ）
   const legacyKey = currentUser === '奥村' ? 'A' : 'B';
-  // 外注スタッフには「自分宛の撮影採寸依頼」＋「自分が作成した下書き」だけ表示（管理者は全件）
+  // 外注スタッフには「自分宛の依頼」＋「自分が作成した下書き」＋「自分の担当商品に紐づく下書き」を表示（管理者は全件）
   const filtered = currentUser === 'admin' ? drafts : drafts.filter(d => {
     if (d.fromRequest) return d.assignee === currentUser || d.assignee === legacyKey;
-    return d.createdBy === currentUser;
+    if (d.createdBy === currentUser) return true;
+    const a = _assignees[String(d.id)] || ''; // 下書きIDに対応する在庫の担当者
+    return a === currentUser || a === legacyKey;
   });
   if (cntEl) cntEl.textContent = filtered.length;
   if (!filtered.length) {
