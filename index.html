@@ -283,10 +283,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- 📦 担当商品 -->
   <div class="panel on" id="panel-items">
-    <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <input type="text" id="item-search" placeholder="🔍 管理番号・ブランドで検索" oninput="onItemSearch(this.value)"
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
       <button class="btn btn-outline btn-sm" id="item-sort-btn" onclick="toggleItemSort()" style="flex-shrink:0;white-space:nowrap">No.↑</button>
+    </div>
+    <div style="margin-bottom:10px">
+      <button class="btn btn-outline btn-sm" id="item-ship-btn" onclick="toggleShipOnly()" style="white-space:nowrap">🚚 要発送のみ</button>
     </div>
     <div id="items-list"></div>
     <div id="packed-section" style="margin-top:14px;display:none">
@@ -636,12 +639,23 @@ function renderCurrentTab() {
 /* ===== 担当商品 ===== */
 let _itemSearch = '';
 let _itemSortAsc = true; // true:番号昇順 / false:降順
+let _itemShipOnly = false; // 要発送（売却済み）のみに絞り込み
 
 function onItemSearch(v) { _itemSearch = (v||'').trim().toLowerCase(); renderItems(); }
 function toggleItemSort() {
   _itemSortAsc = !_itemSortAsc;
   const btn = document.getElementById('item-sort-btn');
   if (btn) btn.textContent = _itemSortAsc ? 'No.↑' : 'No.↓';
+  renderItems();
+}
+function toggleShipOnly() {
+  _itemShipOnly = !_itemShipOnly;
+  const btn = document.getElementById('item-ship-btn');
+  if (btn) {
+    btn.textContent = _itemShipOnly ? '🚚 要発送のみ ✓' : '🚚 要発送のみ';
+    btn.style.background = _itemShipOnly ? 'var(--primary)' : '';
+    btn.style.color = _itemShipOnly ? '#fff' : '';
+  }
   renderItems();
 }
 
@@ -670,6 +684,7 @@ function myItems() {
     .filter(i => {
       if (!_assignedToMe(i)) return false;
       if (_packedByMe(i.id)) return false; // 発送済みは通常リストから外す
+      if (_itemShipOnly && i.status !== 'sold') return false; // 「要発送のみ」絞り込み
       // 売却済みは「最近売れて、まだ発送チェックしていないもの」だけ残す
       if (i.status === 'sold') {
         const t = i.saleDate ? Date.parse(i.saleDate) : 0;
@@ -705,7 +720,7 @@ function renderItems() {
   const items = myItems();
   renderPackedItems(); // 「発送済み（取り消せます）」セクションも更新
   if (!items.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>${_itemSearch ? '該当する商品はありません' : '担当商品はありません'}</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>${_itemShipOnly ? '要発送の商品はありません' : (_itemSearch ? '該当する商品はありません' : '担当商品はありません')}</p></div>`;
     return;
   }
   el.innerHTML = items.map(item => {
