@@ -740,6 +740,7 @@ function renderItems() {
         <span class="badge ${stClass}" style="${badgeStyle}">${stLabel}</span>
       </div>
       <div class="item-meta" style="margin-top:4px">${item.genre||''}${item.size?'　サイズ：'+item.size:''}${assignDateLabel(item.id)}</div>
+      ${item.workerNote ? `<div style="margin-top:8px;padding:8px 10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;font-size:13px;color:#92400E;white-space:pre-wrap">📝 指示：${item.workerNote}</div>` : ''}
       <div class="item-checks">
         <label class="check-row" onclick="toggleWork(event,${item.id},'shoot',${hasShoot})">
           <input type="checkbox" ${hasShoot?'checked':''} readonly>
