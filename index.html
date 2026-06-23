@@ -740,7 +740,9 @@ function renderItems() {
         <span class="badge ${stClass}" style="${badgeStyle}">${stLabel}</span>
       </div>
       <div class="item-meta" style="margin-top:4px">${item.genre||''}${item.size?'　サイズ：'+item.size:''}${assignDateLabel(item.id)}</div>
-      ${item.workerNote ? `<div style="margin-top:8px;padding:8px 10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;font-size:13px;color:#92400E;white-space:pre-wrap">📝 指示：${item.workerNote}</div>` : ''}
+      ${item.workerNote
+        ? `<div onclick="editWorkerNote(${item.id})" style="cursor:pointer;margin-top:8px;padding:8px 10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;font-size:13px;color:#92400E;white-space:pre-wrap">📝 指示：${item.workerNote}　<span style="font-size:11px;color:#B45309">（タップで編集）</span></div>`
+        : `<button onclick="editWorkerNote(${item.id})" style="margin-top:8px;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 メモを追加</button>`}
       <div class="item-checks">
         <label class="check-row" onclick="toggleWork(event,${item.id},'shoot',${hasShoot})">
           <input type="checkbox" ${hasShoot?'checked':''} readonly>
@@ -754,6 +756,17 @@ function renderItems() {
       <button class="btn btn-outline-primary btn-sm" onclick="openMeasureForItem(${item.id})">📋 採寸・説明文を入力</button>
     </div>`;
   }).join('');
+}
+
+// 商品へのメモ（指示）を入力・編集。在庫データに保存（在庫アプリと共有）。
+function editWorkerNote(itemId) {
+  const item = _inventory.find(i => i.id === itemId);
+  if (!item) return;
+  const v = window.prompt('📝 この商品へのメモ（発送指示など）', item.workerNote || '');
+  if (v === null) return; // キャンセル
+  db.collection('inventory').doc(String(itemId)).set({ workerNote: v.trim(), _updatedAt: Date.now() }, { merge: true })
+    .then(() => showToast('📝 メモを保存しました'))
+    .catch(e => { console.error('メモ保存エラー:', e); showToast('❌ メモの保存に失敗しました', 5000); });
 }
 
 // 発送済み（取り消せます）セクション
