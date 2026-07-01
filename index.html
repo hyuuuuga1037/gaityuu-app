@@ -356,18 +356,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
       </div>
     </div>
-    <!-- アピール -->
-    <div class="card">
-      <div class="sec-ttl">アピールポイント・状態</div>
-      <div class="fg">
-        <div class="fl">詳細 <span class="opt">任意</span></div>
-        <textarea id="f-appeal" rows="4" placeholder="例：クリーニング済み。目立った傷・汚れなし。"></textarea>
-      </div>
-      <div class="fg">
-        <div class="fl">ハッシュタグ <span class="opt">任意</span></div>
-        <input type="text" id="f-tags" placeholder="例：#スーツ #セットアップ">
-      </div>
-    </div>
     <!-- 配送・価格 -->
     <div class="card">
       <div class="sec-ttl">配送方法 <span class="opt">任意</span></div>
@@ -1262,16 +1250,33 @@ function renderDraftList() {
   }
   const pendingIds = new Set(Object.keys(_pdSaves()));
   el.innerHTML = filtered.map(d => `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
-      <div style="min-width:0;overflow:hidden">
-        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
-        <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
+    <div style="padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="min-width:0;overflow:hidden">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
+          <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
+          <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
+        </div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
-        <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
-      </div>
+      ${d.memo
+        ? `<div onclick="editDraftMemo(${d.id})" style="cursor:pointer;margin-top:8px;padding:7px 9px;background:#EFF6FF;border:1px solid #3B82F6;border-radius:8px;font-size:12px;color:#1E40AF;white-space:pre-wrap">📝 ${d.memo}　<span style="font-size:10px;color:#3B82F6">（タップで編集）</span></div>`
+        : `<button onclick="editDraftMemo(${d.id})" style="margin-top:8px;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 作業メモを追加</button>`}
     </div>`).join('');
+}
+
+// 下書きへの作業メモ（撮影マニュアルの該当箇所など）を編集
+function editDraftMemo(id) {
+  const d = getDrafts().find(x => x.id === id);
+  if (!d) return;
+  const v = window.prompt('📝 この下書きへの作業メモ\n（例：撮影マニュアルP3参照／襟のシワに注意）', d.memo || '');
+  if (v === null) return;
+  saveDraftDoc({ ...d, memo: v.trim(), savedAt: new Date().toISOString() });
+  _rebuildDrafts();
+  renderDraftList();
+  showToast('📝 メモを保存しました');
 }
 
 /* ===== バックアップ履歴（管理者のみ・復元用） ===== */
@@ -1611,18 +1616,19 @@ function renderSuitMeasures(area){
         <div class="rb" data-g="vent" data-v="サイドベンツ" onclick="setSuitDesignRadio('vent','サイドベンツ')">サイドベンツ</div>
       </div></div>
       <div class="fg"><div class="fl">オプション <span class="opt">複数選択可</span></div>
-        <div class="rg" id="suit-options-rg" style="flex-wrap:wrap">
-          <div class="rb" data-v="本切羽" onclick="toggleSuitOption(this)">本切羽</div>
+        <div class="rg" id="suit-options-rg" style="flex-wrap:wrap;white-space:nowrap">
+          <div class="rb" data-v="本切羽" onclick="toggleSuitOption(this)">本切羽（袖口ボタンが開く）</div>
           <div class="rb" data-v="ストレッチ" onclick="toggleSuitOption(this)">ストレッチ</div>
           <div class="rb" data-v="ウォッシャブル" onclick="toggleSuitOption(this)">ウォッシャブル</div>
           <div class="rb" data-v="ウール100%" onclick="toggleSuitOption(this)">ウール100%</div>
           <div class="rb" data-v="ウエスト滑り止め" onclick="toggleSuitOption(this)">ウエスト滑り止め</div>
           <div class="rb" data-v="ノーカラー" onclick="toggleSuitOption(this)">ノーカラー</div>
           <div class="rb" data-v="アジャスター" onclick="toggleSuitOption(this)">アジャスター</div>
+          <div class="rb" data-v="ネーム刺繍" onclick="toggleSuitOption(this)">ネーム刺繍</div>
         </div>
       </div>
-      <div class="fg"><div class="fl">その他・色柄 <span class="opt">任意・複数行OK</span></div>
-        <textarea id="suit-design-memo" rows="2" placeholder="例：ネイビー系／チェック（改行で複数行OK）"></textarea>
+      <div class="fg"><div class="fl">色・柄 <span class="opt">任意</span></div>
+        <input type="text" id="suit-design-memo" placeholder="例：ネイビー・チェック">
       </div>
     </div>`;
   setSuitStyle(suitStyle);
