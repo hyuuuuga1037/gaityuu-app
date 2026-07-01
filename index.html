@@ -336,7 +336,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
       <div class="fg">
         <div class="fl">ブランド名 <span class="opt">任意</span></div>
-        <input type="text" id="f-brand" placeholder="例：SUITS SELECT、青山、AOKI">
+        <textarea id="f-brand" rows="2" placeholder="例：AOKI（改行でカナ・生地情報も入力可）"></textarea>
       </div>
       <div class="fg">
         <div class="fl">表記サイズ <span class="opt">任意</span></div>
@@ -1197,6 +1197,8 @@ const MEASURES = {
 
 let selCat='', selCond='', selShip='';
 let suitType='setup', hemType='single';
+let suitStyle='business'; // business/formal/vintage/ladies（スーツの種類）
+let doubleBtnCount=''; // ダブル選択時の 4つボタン / 6つボタン
 let suitDesign={lining:'',buttons:'',vent:'',options:[]};
 let jerseyType='setup', suitThreePiece=false;
 let genText='';
@@ -1347,6 +1349,8 @@ function loadDraftIntoForm(id) {
   // スーツ・ジャージ系の状態を復元
   if (draft.suitType) suitType = draft.suitType;
   if (draft.hemType) hemType = draft.hemType;
+  suitStyle = draft.suitStyle || 'business';
+  doubleBtnCount = draft.doubleBtnCount || '';
   if (draft.suit_design) {
     suitDesign = {
       lining: draft.suit_design.lining || '',
@@ -1371,6 +1375,22 @@ function loadDraftIntoForm(id) {
       const el = document.getElementById(kDash) || document.getElementById('m-' + kDash);
       if (el && m[k]) el.value = m[k];
     });
+    // スーツのフォーム状態を復元（種類・種別・裾・3点・デザイン選択・色柄）
+    if (selCat === 'suit') {
+      setSuitStyle(suitStyle);
+      setSuitType(suitType);
+      setHemType(hemType);
+      const tp = document.getElementById('three-piece-btn'); if (tp) tp.classList.toggle('on', suitThreePiece);
+      updateThreePieceSections();
+      ['lining','buttons','vent'].forEach(g => {
+        document.querySelectorAll(`[data-g="${g}"]`).forEach(b => b.classList.toggle('on', b.dataset.v === suitDesign[g]));
+      });
+      document.querySelectorAll('#suit-options-rg .rb').forEach(b => b.classList.toggle('on', suitDesign.options.includes(b.dataset.v)));
+      const adjRow = document.getElementById('sp-waist-max-row'); if (adjRow) adjRow.style.display = suitDesign.options.includes('アジャスター') ? 'flex' : 'none';
+      const sub = document.getElementById('double-sub-row'); if (sub) sub.style.display = (suitDesign.buttons === 'ダブル') ? 'block' : 'none';
+      document.querySelectorAll('#double-sub-row .rb').forEach(b => b.classList.toggle('on', b.dataset.v === doubleBtnCount));
+      const memoEl = document.getElementById('suit-design-memo'); if (memoEl && draft.suit_design) memoEl.value = draft.suit_design.memo || '';
+    }
   }, 300);
 
   switchTab('measure');
@@ -1518,6 +1538,14 @@ function renderMeasures(){
 
 function renderSuitMeasures(area){
   area.innerHTML=`
+    <div class="fg"><div class="fl">スーツの種類</div>
+      <div class="rg" id="suit-style-rg" style="flex-wrap:wrap">
+        <div class="rb on" data-v="business" onclick="setSuitStyle('business')">ビジネス</div>
+        <div class="rb" data-v="formal" onclick="setSuitStyle('formal')">礼服</div>
+        <div class="rb" data-v="vintage" onclick="setSuitStyle('vintage')">ヴィンテージ</div>
+        <div class="rb" data-v="ladies" onclick="setSuitStyle('ladies')">レディース</div>
+      </div>
+    </div>
     <div class="fg"><div class="fl">種別</div>
       <div class="rg" id="suit-type-rg">
         <div class="rb on" data-v="setup" onclick="setSuitType('setup')">セットアップ</div>
@@ -1534,7 +1562,8 @@ function renderSuitMeasures(area){
     </div></div>
     <div id="suit-pants-sec"><div class="suit-sec">
       <div class="suit-sec-ttl">👖 パンツ採寸</div>
-      <div class="mr"><div class="ml">ウエスト</div><div class="mw"><input type="number" id="sp-waist" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">ウエスト<span id="sp-waist-label"></span></div><div class="mw"><input type="number" id="sp-waist" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr" id="sp-waist-max-row" style="display:none"><div class="ml">ウエスト最大<small>アジャスター</small></div><div class="mw"><input type="number" id="sp-waist-max" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
       <div class="mr"><div class="ml">総丈</div><div class="mw"><input type="number" id="sp-sozo" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
       <div class="mr"><div class="ml">わたり幅</div><div class="mw"><input type="number" id="sp-watari" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
       <div class="mr"><div class="ml">股下</div><div class="mw"><input type="number" id="sp-inseam" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
@@ -1551,7 +1580,7 @@ function renderSuitMeasures(area){
         <div class="mw"><input type="number" id="sp-fold" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div>
       </div>
     </div></div>
-    <div class="fg" style="margin-bottom:4px"><div class="fl">スリーピース</div>
+    <div class="fg" style="margin-bottom:4px"><div class="fl" id="three-piece-label">スリーピース</div>
       <div class="rg"><div class="rb" id="three-piece-btn" onclick="setSuitThreePiece()">3ピース（ベスト付き）</div></div>
     </div>
     <div id="suit-vest-sec" style="display:none"><div class="suit-sec">
@@ -1560,15 +1589,22 @@ function renderSuitMeasures(area){
       <div class="mr"><div class="ml">身幅</div><div class="mw"><input type="number" id="sv-mimi" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
       <div class="mr"><div class="ml">着丈</div><div class="mw"><input type="number" id="sv-take" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
     </div></div>
+    <div id="suit-skirt-sec" style="display:none"><div class="suit-sec">
+      <div class="suit-sec-ttl">👗 スカート採寸</div>
+      <div class="mr"><div class="ml">表記</div><div class="mw"><input type="text" id="sk-hyoki" placeholder="例：9" style="width:80px"></div></div>
+      <div class="mr"><div class="ml">ウエスト</div><div class="mw"><input type="number" id="sk-waist" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">ヒップ</div><div class="mw"><input type="number" id="sk-hip" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+      <div class="mr"><div class="ml">丈</div><div class="mw"><input type="number" id="sk-take" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+    </div></div>
     <div class="suit-sec"><div class="suit-sec-ttl">🎨 デザイン・仕様</div>
       <div class="fg"><div class="fl">裏地</div><div class="rg">
         <div class="rb" data-g="lining" data-v="背抜き" onclick="setSuitDesignRadio('lining','背抜き')">背抜き</div>
         <div class="rb" data-g="lining" data-v="総裏" onclick="setSuitDesignRadio('lining','総裏')">総裏</div>
       </div></div>
-      <div class="fg"><div class="fl">ボタン</div><div class="rg">
-        <div class="rb" data-g="buttons" data-v="2つボタン" onclick="setSuitDesignRadio('buttons','2つボタン')">2つボタン</div>
-        <div class="rb" data-g="buttons" data-v="3つボタン" onclick="setSuitDesignRadio('buttons','3つボタン')">3つボタン</div>
-        <div class="rb" data-g="buttons" data-v="段返り3つボタン" onclick="setSuitDesignRadio('buttons','段返り3つボタン')">段返り3つボタン</div>
+      <div class="fg"><div class="fl">ボタン</div><div class="rg" id="suit-buttons-rg" style="flex-wrap:wrap"></div></div>
+      <div class="fg" id="double-sub-row" style="display:none"><div class="fl">ダブルのボタン数</div><div class="rg">
+        <div class="rb" data-g="doubleBtn" data-v="4つボタン" onclick="setDoubleBtn('4つボタン')">4つボタン</div>
+        <div class="rb" data-g="doubleBtn" data-v="6つボタン" onclick="setDoubleBtn('6つボタン')">6つボタン</div>
       </div></div>
       <div class="fg"><div class="fl">ベント</div><div class="rg">
         <div class="rb" data-g="vent" data-v="センターベント" onclick="setSuitDesignRadio('vent','センターベント')">センターベント</div>
@@ -1576,17 +1612,20 @@ function renderSuitMeasures(area){
       </div></div>
       <div class="fg"><div class="fl">オプション <span class="opt">複数選択可</span></div>
         <div class="rg" id="suit-options-rg" style="flex-wrap:wrap">
-          <div class="rb" data-v="ダブルブレスト" onclick="toggleSuitOption(this)">ダブルブレスト</div>
           <div class="rb" data-v="本切羽" onclick="toggleSuitOption(this)">本切羽</div>
           <div class="rb" data-v="ストレッチ" onclick="toggleSuitOption(this)">ストレッチ</div>
           <div class="rb" data-v="ウォッシャブル" onclick="toggleSuitOption(this)">ウォッシャブル</div>
           <div class="rb" data-v="ウール100%" onclick="toggleSuitOption(this)">ウール100%</div>
+          <div class="rb" data-v="ウエスト滑り止め" onclick="toggleSuitOption(this)">ウエスト滑り止め</div>
+          <div class="rb" data-v="ノーカラー" onclick="toggleSuitOption(this)">ノーカラー</div>
+          <div class="rb" data-v="アジャスター" onclick="toggleSuitOption(this)">アジャスター</div>
         </div>
       </div>
-      <div class="fg"><div class="fl">その他・色柄 <span class="opt">任意</span></div>
-        <input type="text" id="suit-design-memo" placeholder="例：グレー系、ストライプ、チェック">
+      <div class="fg"><div class="fl">その他・色柄 <span class="opt">任意・複数行OK</span></div>
+        <textarea id="suit-design-memo" rows="2" placeholder="例：ネイビー系／チェック（改行で複数行OK）"></textarea>
       </div>
     </div>`;
+  setSuitStyle(suitStyle);
   setSuitType(suitType);
   suitThreePiece=false;
 }
@@ -1608,7 +1647,44 @@ function setHemType(v){
 function setSuitThreePiece(){
   suitThreePiece=!suitThreePiece;
   const btn=document.getElementById('three-piece-btn'); if(btn) btn.classList.toggle('on',suitThreePiece);
-  const sec=document.getElementById('suit-vest-sec'); if(sec) sec.style.display=suitThreePiece?'block':'none';
+  updateThreePieceSections();
+}
+function updateThreePieceSections(){
+  const isLadies=suitStyle==='ladies';
+  const vest=document.getElementById('suit-vest-sec');
+  const skirt=document.getElementById('suit-skirt-sec');
+  if(vest) vest.style.display=(suitThreePiece&&!isLadies)?'block':'none';
+  if(skirt) skirt.style.display=(suitThreePiece&&isLadies)?'block':'none';
+}
+// スーツ種類ごとのボタン選択肢 [表示ラベル, 生成文に出る値]
+function suitButtonOptions(){
+  return suitStyle==='ladies'
+    ? [['1つボタン','1つボタン'],['2つボタン','2つボタン'],['ホック','ホック']]
+    : [['2つボタン','2つボタン'],['3つボタン','3つボタン'],['段返り','段返り3つボタン'],['ダブル','ダブル']];
+}
+function renderSuitButtons(){
+  const rg=document.getElementById('suit-buttons-rg'); if(!rg) return;
+  rg.innerHTML=suitButtonOptions().map(([label,val])=>
+    `<div class="rb${suitDesign.buttons===val?' on':''}" data-g="buttons" data-v="${val}" onclick="setSuitDesignRadio('buttons','${val}')">${label}</div>`).join('');
+  const sub=document.getElementById('double-sub-row');
+  if(sub) sub.style.display=(suitDesign.buttons==='ダブル')?'block':'none';
+  document.querySelectorAll('#double-sub-row .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===doubleBtnCount));
+}
+function setDoubleBtn(v){
+  doubleBtnCount = doubleBtnCount===v?'':v;
+  document.querySelectorAll('#double-sub-row .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===doubleBtnCount));
+}
+function setSuitStyle(v){
+  suitStyle=v;
+  document.querySelectorAll('#suit-style-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  const valid=suitButtonOptions().map(o=>o[1]);
+  if(!valid.includes(suitDesign.buttons)){ suitDesign.buttons=''; doubleBtnCount=''; }
+  renderSuitButtons();
+  const lbl=document.getElementById('three-piece-label');
+  const btn=document.getElementById('three-piece-btn');
+  if(v==='ladies'){ if(lbl) lbl.textContent='3点セット'; if(btn) btn.textContent='3点（スカート付き）'; }
+  else { if(lbl) lbl.textContent='スリーピース'; if(btn) btn.textContent='3ピース（ベスト付き）'; }
+  updateThreePieceSections();
 }
 function renderJerseyMeasures(area){
   area.innerHTML=`
@@ -1643,12 +1719,22 @@ function setJerseyType(val){
 function setSuitDesignRadio(group,val){
   suitDesign[group]=suitDesign[group]===val?'':val;
   document.querySelectorAll(`[data-g="${group}"]`).forEach(b=>b.classList.toggle('on',b.dataset.v===suitDesign[group]));
+  if(group==='buttons'){
+    if(suitDesign.buttons!=='ダブル') doubleBtnCount='';
+    const sub=document.getElementById('double-sub-row');
+    if(sub) sub.style.display=(suitDesign.buttons==='ダブル')?'block':'none';
+    document.querySelectorAll('#double-sub-row .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===doubleBtnCount));
+  }
 }
 function toggleSuitOption(el){
   const val=el.dataset.v;
   const idx=suitDesign.options.indexOf(val);
   if(idx>=0) suitDesign.options.splice(idx,1); else suitDesign.options.push(val);
   el.classList.toggle('on',suitDesign.options.includes(val));
+  if(val==='アジャスター'){
+    const on=suitDesign.options.includes('アジャスター');
+    const row=document.getElementById('sp-waist-max-row'); if(row) row.style.display=on?'flex':'none';
+  }
 }
 function buildSuitDesignLines(){
   const parts=[];
@@ -1663,6 +1749,138 @@ function buildSuitDesignLines(){
 function fv(id){ const el=document.getElementById(id); return el?el.value.trim():''; }
 function fm(id){ const el=document.getElementById(id); return el?parseFloat(el.value)||0:0; }
 function fcm(id){ const val=fm(id); return val>0?val+'cm':'－'; }
+
+// スーツ共通の固定文（ヴィンテージ除く）
+const SUIT_STATUS_FIXED = ['使用感の少ない美品です♪','まだまだご使用いただけます。'];
+const SUIT_HOSOKU_FIXED = ['美品とはいえ、あくまでも中古品です。','新品をお求めの方、神経質な方はご遠慮下さい。','ご理解頂ける方ご購入お待ちしております。'];
+
+function suitWaistText(){
+  if(suitDesign.options.includes('アジャスター')){
+    const mn=fm('sp-waist'), mx=fm('sp-waist-max');
+    if(mn>0&&mx>0) return mn+'〜'+mx+'cm(アジャスター付き)';
+  }
+  return fcm('sp-waist');
+}
+function suitButtonText(){
+  if(suitDesign.buttons==='ダブル') return doubleBtnCount?('ダブル '+doubleBtnCount):'ダブル';
+  return suitDesign.buttons;
+}
+function suitOptionLines(){
+  const out=[];
+  suitDesign.options.forEach(o=>{
+    if(o==='ノーカラー'){ out.push('ノーカラージャケット'); out.push('カラーレスジャケット'); }
+    else if(o==='アジャスター'){ out.push('ウエストアジャスター'); out.push('ウエスト調整'); }
+    else out.push(o);
+  });
+  return out;
+}
+function colorPatternLines(){ return (fv('suit-design-memo')||'').split('\n').map(s=>s.trim()).filter(Boolean); }
+function suitDesignBlock(){
+  const parts=[];
+  colorPatternLines().forEach(l=>parts.push(l));
+  if(suitDesign.lining) parts.push(suitDesign.lining);
+  if(suitButtonText()) parts.push(suitButtonText());
+  if(suitDesign.vent) parts.push(suitDesign.vent);
+  suitOptionLines().forEach(o=>parts.push(o));
+  return parts;
+}
+function suitSizeBlock(size){
+  const st=suitType, L=['■サイズ'];
+  if(st!=='pants_only'){
+    L.push('・ジャケット');
+    if(size) L.push('表記：'+size);
+    L.push('着丈：'+fcm('sj-take')); L.push('肩幅：'+fcm('sj-kata'));
+    L.push('身幅：'+fcm('sj-mimi')); L.push('袖丈：'+fcm('sj-sode'));
+  }
+  if(suitThreePiece && suitStyle!=='ladies' && st!=='pants_only'){
+    L.push(''); L.push('・ベスト');
+    L.push('着丈：'+fcm('sv-take')); L.push('肩幅：'+fcm('sv-kata')); L.push('身幅：'+fcm('sv-mimi'));
+  }
+  if(suitThreePiece && suitStyle==='ladies'){
+    L.push(''); L.push('・スカート');
+    const sh=fv('sk-hyoki'); if(sh) L.push('表記：'+sh);
+    L.push('ウエスト：'+fcm('sk-waist')); L.push('ヒップ：'+fcm('sk-hip')); L.push('丈：'+fcm('sk-take'));
+  }
+  if(st!=='jacket'){
+    L.push(''); L.push('・パンツ');
+    if(size) L.push('表記：'+size);
+    L.push('ウエスト：'+suitWaistText()); L.push('総丈：'+fcm('sp-sozo'));
+    if(fm('sp-inseam')>0) L.push('股下：'+fcm('sp-inseam'));
+    L.push('わたり幅：'+fcm('sp-watari')); L.push('裾幅：'+fcm('sp-hem'));
+    L.push(hemType==='double'?('裾ダブル仕上げ'+(fm('sp-fold')>0?'（折り返し'+fcm('sp-fold')+'）':'')):'裾シングル仕上げ');
+    if(fm('sp-hemextra')>0){ L.push(''); L.push('裾折り返し'+fm('sp-hemextra')+'cmほどあるので、'); L.push('お直しで少し伸ばせます。'); }
+  }
+  L.push(''); L.push('※平置き実寸。素人採寸です。'); L.push('誤差はご了承ください。');
+  return L;
+}
+
+function buildSuitText(brand,size,mgmt){
+  const L=[]; const push=(...xs)=>xs.forEach(x=>L.push(x));
+  const hasAdjuster=suitDesign.options.includes('アジャスター');
+  const stComp = suitType==='setup' ? (suitThreePiece&&suitStyle!=='ladies'?'ジャケット　ベスト　スラックス':'ジャケット　スラックス') : '';
+
+  if(suitStyle==='vintage'){
+    push('コメントなしの即購入、歓迎です！','','・24時間以内発送','・匿名配送','');
+    push('クラシックかつ迫力のあるダブルブレストスーツ。','当時らしいゆとりのあるジャケットシルエットと、','ワイドスラックスが生み出す美しい','ドレープ感が最大の魅力です。','');
+    push('程よく主張のあるラペルや直線的なラインは、','現代の細身スーツにはない存在感。','セットアップでの着用はもちろん、','ジャケット単体・パンツ単体でも','スタイリングの主役になります。','');
+    push('90s特有の空気感を纏った一着で、','今のトレンドとも相性抜群。','');
+    push('古着・ヴィンテージがお好きな方、','菅田将暉さんのような古着ミックススタイルが','お好きな方、結婚式や特別なパーティーで','周りと差をつけたい方におすすめです♩','');
+    push('メンズ スーツ セットアップ 上下','ビジネス ブラックフォーマル セレモニー カジュアル','ダブルブレスト ダブルボタン ヴィンテージ レトロ','ボックスシルエット　オーバーサイズ');
+    suitDesignBlock().forEach(l=>push(l));
+    push('','■その他のヴィンテージスーツ','#ひなたヴィンテージスーツ','');
+    push('■ブランド'); if(brand) push(brand); push('');
+    suitSizeBlock(size).forEach(l=>push(l));
+    push('','■状態','全体的に使用感の感じられない美品です♪','まだまだご使用いただけます！');
+    push('','■補足','あくまでも中古ヴィンテージスーツです。','多少のスレや汚れはあるものとお考えください。','新品をお求めの方、あまりにも神経質な方はご遠慮下さい。','ご理解頂ける方ご購入お待ちしております。');
+    push('','■発送','※送料の関係でコンパクトに畳んで発送いたします。','多少の畳みジワが発生しますことをご了承くださいませ。');
+    push('','冠婚葬祭、結婚式 、二次会、ウエディングフォト、成人式、卒業式、入学式、セレモニー、パーティー、式典、舞台衣装、ステージ衣装、ライブ、スーツ、プライベートとオールシーズン様々なシーンで活躍します。');
+    if(mgmt) push('',mgmt);
+    return L;
+  }
+
+  if(suitStyle==='ladies'){
+    push('コメントなしの即購入、歓迎です！','','・24時間以内発送','・匿名配送','');
+    push('■その他レディーススーツ','他にもスーツを出品しております。','#ひなたレディーススーツ','スーツおまとめ購入で2点目1,000円引き♪','ご希望の方は、コメントにてご相談ください。','');
+    push('■ブランド'); if(brand) push(brand); push('');
+    push('ビジネススーツ','セットアップ','オフィスカジュアル','');
+    const dp=suitDesignBlock();
+    if(dp.length){ push('■アイテム/デザイン'); dp.forEach(l=>push(l)); push(''); }
+    suitSizeBlock(size).forEach(l=>push(l));
+    push('','■状態',...SUIT_STATUS_FIXED);
+    push('','■補足',...SUIT_HOSOKU_FIXED);
+    push('','■発送','※送料の関係でコンパクトに畳んで発送いたします。','畳みジワが発生しますことをご了承くださいませ。');
+    push('','セレモニー フォーマル　','入園式 卒園式 卒業式 入学式 参観日','オフィス 通勤 ビジネス ','ママスーツ 冠婚葬祭');
+    if(mgmt) push('',mgmt);
+    return L;
+  }
+
+  // formal / business（メンズ）
+  push('コメントなしの即購入、歓迎です！','');
+  if(suitStyle==='formal'){
+    push('即日、匿名で発送します！','お急ぎご利用の方もお気軽にご相談ください！','');
+    if(hasAdjuster) push('ウエストアジャスター付きで体型変化にも対応♪','');
+    push('■その他礼服','他にもメンズ、レディースともに','礼服を出品しております。','#ひなた礼服','礼服2点ご購入で2点目1,000円引き♪','コメントにてご相談ください♪','');
+    push('■アイテム','礼服　喪服　セットアップ　セレモニースーツ　ブラックフォーマル　冠婚葬祭　スーツ　結婚式','');
+  } else {
+    push('・24時間以内発送','・匿名配送','');
+    push('■その他同サイズスーツ','#ひなたスーツ','');
+    if(suitThreePiece) push('■その他同スリーピーススーツ','#ひなたスリーピーススーツ','');
+  }
+  push('■ブランド'); if(brand) push(brand); push('');
+  if(suitStyle==='business'){
+    push('ビジネススーツ'); if(suitType==='setup') push('セットアップ'); if(stComp) push(stComp);
+    push('');
+  }
+  const dp=suitDesignBlock();
+  if(dp.length){ push('■デザイン'); dp.forEach(l=>push(l)); push(''); }
+  suitSizeBlock(size).forEach(l=>push(l));
+  push('','■状態',...SUIT_STATUS_FIXED);
+  push('','■補足',...SUIT_HOSOKU_FIXED);
+  push('','■発送','※送料の関係でコンパクトに畳んで発送いたします。','畳みジワが発生しますことをご了承くださいませ。');
+  if(suitThreePiece) push('','結婚式 、二次会、成人式、入学式、パーティー、式典、スーツ、プライベートとオールシーズン様々なシーンで活躍します。');
+  if(mgmt) push('',mgmt);
+  return L;
+}
 
 function generateText(){
   const name=fv('f-name'),brand=fv('f-brand'),size=fv('f-size'),mgmt=fv('f-mgmt'),appeal=fv('f-appeal'),tags=fv('f-tags'),price=fv('f-price');
@@ -1680,48 +1898,7 @@ function generateText(){
     schema.forEach(ms=>{ const val=fm('m-'+ms.k); if(val>0) lines.push(`${ms.k}：${val}cm`); });
     lines.push('');
   } else if(selCat==='suit'){
-    const st=suitType;
-    const designParts=buildSuitDesignLines();
-    const stLabel=st==='setup'?(suitThreePiece?'3ピース セットアップ':'セットアップ'):st==='jacket'?'ジャケット単品':'パンツ単品';
-    lines=[];
-    lines.push('コメントなしの即購入、歓迎です！');lines.push('');lines.push('・24時間以内発送');lines.push('・匿名配送');
-    lines.push('');lines.push('');lines.push('■その他同サイズスーツ');lines.push('#ひなたスーツS');
-    lines.push('');lines.push('');lines.push('■ブランド');if(brand) lines.push(brand);
-    lines.push('');lines.push('ビジネススーツ');lines.push(stLabel);
-    if(st==='setup') lines.push(suitThreePiece?'ジャケット　ベスト　スラックス':'ジャケット　スラックス');
-    lines.push('');
-    if(designParts.length){lines.push('■デザイン');designParts.forEach(p=>lines.push(p));lines.push('');}
-    lines.push('');lines.push('■サイズ');
-    if(st!=='pants_only'){
-      lines.push('・ジャケット');if(size) lines.push(`表記：${size}`);
-      lines.push(`着丈：${fcm('sj-take')}`);lines.push(`肩幅：${fcm('sj-kata')}`);
-      lines.push(`身幅：${fcm('sj-mimi')}`);lines.push(`袖丈：${fcm('sj-sode')}`);
-    }
-    if(suitThreePiece&&st!=='pants_only'){
-      lines.push('');lines.push('・ベスト');
-      lines.push(`肩幅：${fcm('sv-kata')}`);lines.push(`身幅：${fcm('sv-mimi')}`);lines.push(`着丈：${fcm('sv-take')}`);
-    }
-    if(st!=='jacket'){
-      if(st!=='pants_only') lines.push('');
-      lines.push('・パンツ');if(size) lines.push(`表記　　：${size}`);
-      lines.push(`ウエスト：${fcm('sp-waist')}`);lines.push(`総丈　　：${fcm('sp-sozo')}`);
-      if(fm('sp-inseam')>0) lines.push(`股下　　：${fcm('sp-inseam')}`);
-      lines.push(`わたり幅：${fcm('sp-watari')}`);lines.push(`裾幅　　：${fcm('sp-hem')}`);
-      lines.push('');
-      lines.push(hemType==='double'?`ダブル仕上げ${fm('sp-fold')>0?' （折り返し'+fcm('sp-fold')+'）':''}`:'シングル仕上げ');
-      if(fm('sp-hemextra')>0){lines.push('');lines.push(`裾折り返し${fm('sp-hemextra')}cmほどあるので、お直し可能`);}
-    }
-    lines.push('');lines.push('※平置き実寸。素人採寸です。');lines.push('誤差はご了承ください。');
-    lines.push('');lines.push('■状態');lines.push(appeal||'');
-    lines.push('');lines.push('■補足');
-    lines.push('あくまでも中古品です。');lines.push('新品をお求めの方、神経質な方はご遠慮下さい。');
-    lines.push('ご理解頂ける方ご購入お待ちしております。');
-    lines.push('');lines.push('');lines.push('■発送');
-    lines.push('※送料の関係でコンパクトに畳んで発送いたします。');
-    lines.push('畳みジワが発生しますことをご了承くださいませ。');
-    lines.push('');
-    lines.push('結婚式 、二次会、ウエディングフォト、成人式、卒業式、入学式、セレモニー、パーティー、式典、舞台衣装、ステージ衣装、ライブ、スーツ、プライベートとオールシーズン様々なシーンで活躍します。');
-    if(mgmt) lines.push(`\n【管理番号】${mgmt}`);
+    lines = buildSuitText(brand, size, mgmt);
   } else if(selCat==='jersey'){
     const jt=jerseyType;
     const jtLabel=jt==='setup'?'セットアップ':'トラックジャケット';
@@ -1771,7 +1948,7 @@ function collectFormData(){
     cat:selCat,cond:selCond,ship:selShip,
     mgmt:fv('f-mgmt'),name:fv('f-name'),brand:fv('f-brand'),
     size:fv('f-size'),appeal:fv('f-appeal'),tags:fv('f-tags'),price:fv('f-price'),
-    suitType,hemType,
+    suitType,hemType,suitStyle,doubleBtnCount,
     suit_design:selCat==='suit'?{...suitDesign,options:[...suitDesign.options],memo:fv('suit-design-memo')}:null,
     measures:collectMeasures(),
     savedAt:new Date().toISOString(),
@@ -1786,6 +1963,8 @@ function collectMeasures(){
       sp_waist:fm('sp-waist'),sp_sozo:fm('sp-sozo'),sp_inseam:fm('sp-inseam'),sp_watari:fm('sp-watari'),
       sp_hem:fm('sp-hem'),sp_hemextra:fm('sp-hemextra'),sp_fold:fm('sp-fold'),
       sv_kata:suitThreePiece?fm('sv-kata'):0,sv_mimi:suitThreePiece?fm('sv-mimi'):0,sv_take:suitThreePiece?fm('sv-take'):0,
+      sp_waist_max:fm('sp-waist-max'),
+      sk_hyoki:fv('sk-hyoki'),sk_waist:fm('sk-waist'),sk_hip:fm('sk-hip'),sk_take:fm('sk-take'),
       suitThreePiece,
     };
   }
@@ -1812,8 +1991,8 @@ function saveDraft(){
   saveDraftDoc(draft);   // 送信待ちに記録＋送信試行（失敗しても消えない）
   _rebuildDrafts();      // クラウド＋送信待ちを合成して一覧を最新化
   renderDraftList();
-  // 保存後は「新規」状態に戻す。次に別商品を入力・保存しても前の下書きを上書きしない。
-  _currentDraftId=null;
+  // _currentDraftId は保持（同じ下書きを再保存すると上書きされる）。
+  // 別商品を始めるときは「リセット」ボタン、または担当商品から別商品を開く。
   showToast('💾 下書きを保存しました');
 }
 
@@ -1828,7 +2007,7 @@ function resetMeasureForm(silent){
   document.querySelectorAll('.ship').forEach(b=>b.classList.remove('on'));
   document.getElementById('measure-area').innerHTML=
     '<div style="color:var(--gray-400);text-align:center;padding:20px;font-size:13px">↑ カテゴリを選択すると採寸項目が表示されます</div>';
-  suitType='setup';hemType='single';
+  suitType='setup';hemType='single';suitStyle='business';doubleBtnCount='';
   suitDesign={lining:'',buttons:'',vent:'',options:[]};
   jerseyType='setup';suitThreePiece=false;
   genText='';_currentDraftId=null;_selectedItemId=null;
