@@ -556,10 +556,20 @@ let _assigneeDates = {}; // { itemId: updatedAt(ms) } 振り分けた日時
 let _workRecords = [];
 let _rates = null;
 let _extraCharges = []; // 特別費用（研修費など・対象者/月/項目名/金額）
+let _payments = {};     // 振込記録 { 'YYYY-MM': { 奥村:'YYYY-MM-DD', 相川:'...' } }
 let _selectedItemId = null; // 採寸タブで選択中の商品ID
 
 function extraChargesFor(person, month) {
   return _extraCharges.filter(c => c.person === person && c.month === month);
+}
+function getPaidDate(month, person) { return (_payments[month] && _payments[month][person]) || ''; }
+function savePaidDate(month, person, date) {
+  if (currentUser !== 'admin') return;
+  _payments = { ..._payments, [month]: { ...(_payments[month]||{}), [person]: date } };
+  db.collection('settings').doc('payments').set({ [month]: { [person]: date } }, { merge: true })
+    .then(() => showToast(date ? '💴 振込日を記録しました' : '振込日を消去しました'))
+    .catch(e => { console.error('振込日保存エラー:', e); showToast('❌ 保存に失敗しました', 5000); });
+  renderCurrentTab();
 }
 
 /* ===== DATA ===== */
@@ -593,6 +603,11 @@ function initData() {
   // 特別費用（研修費など）
   db.collection('extra_charges').onSnapshot(snap => {
     _extraCharges = snap.docs.map(d => ({ fsId: d.id, ...d.data() }));
+    renderCurrentTab();
+  }, () => {});
+  // 振込記録（月別・担当者別の振込日）
+  db.collection('settings').doc('payments').onSnapshot(snap => {
+    _payments = snap.exists ? snap.data() : {};
     renderCurrentTab();
   }, () => {});
 }
@@ -928,6 +943,10 @@ function renderSummary() {
       ${spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${spaceAmount.toLocaleString()}</span></div>` : ''}
       ${extras.map(c => `<div class="month-row"><span>✨ ${c.label}</span><span>¥${(c.amount||0).toLocaleString()}</span></div>`).join('')}
       <div class="month-row total"><span>合計</span><span>¥${grandTotal.toLocaleString()}</span></div>
+      ${(() => { const paid = getPaidDate(month, currentUser);
+        return `<div class="month-row" style="margin-top:4px;padding:6px 8px;border-radius:6px;background:${paid?'#ECFDF5':'var(--gray-50)'}">
+          <span style="font-weight:600;color:${paid?'var(--success)':'var(--gray-400)'}">${paid?'✅ 振込済み':'⏳ 振込待ち'}</span>
+          <span style="font-size:12px;color:var(--gray-500)">${paid?new Date(paid).toLocaleDateString('ja-JP')+' 振込':'未入金'}</span></div>`; })()}
       <details style="margin-top:8px">
         <summary style="cursor:pointer;font-size:12px;color:var(--primary)">明細を見る（${recs.length}件）</summary>
         <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--gray-200)">${detailRows}</div>
@@ -1011,6 +1030,11 @@ function renderAdminSummary() {
     const grand = ok.total + ai.total;
     const extraRows = (p) => p.extras.map(c => `<div class="month-row"><span>✨ ${c.label}</span><span>¥${(c.amount||0).toLocaleString()}</span></div>`).join('');
     const spaceRow = (p) => p.spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${p.space.toLocaleString()}</span></div>` : '';
+    const payRow = (name) => {
+      const paid = getPaidDate(month, name);
+      return `<div class="month-row" style="align-items:center"><span style="color:${paid?'var(--primary)':'var(--gray-400)'}">${paid?'✅ 振込済み':'💴 振込日'}</span>
+        <input type="date" value="${paid}" onchange="savePaidDate('${month}','${name}',this.value)" style="padding:3px 6px;border:1px solid var(--gray-200);border-radius:6px;font-size:13px;font-family:inherit"></div>`;
+    };
     return `
     <div class="card">
       <div style="font-size:15px;font-weight:700;margin-bottom:12px">${y}年${parseInt(m)}月</div>
@@ -1020,6 +1044,7 @@ function renderAdminSummary() {
       ${spaceRow(ok)}
       ${extraRows(ok)}
       <div class="month-row" style="font-weight:700"><span>奥村さん計</span><span>¥${ok.total.toLocaleString()}</span></div>
+      ${payRow('奥村')}
       <div style="height:1px;background:var(--gray-200);margin:10px 0"></div>
       <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">相川さん</div>
       <div class="month-row"><span>📷 撮影採寸（${ai.shootCnt}件）</span><span>¥${ai.shoot.toLocaleString()}</span></div>
@@ -1027,6 +1052,7 @@ function renderAdminSummary() {
       ${spaceRow(ai)}
       ${extraRows(ai)}
       <div class="month-row" style="font-weight:700"><span>相川さん計</span><span>¥${ai.total.toLocaleString()}</span></div>
+      ${payRow('相川')}
       <div style="height:2px;background:var(--primary);margin:10px 0"></div>
       <div class="month-row" style="font-size:15px;font-weight:700"><span>外注費合計</span><span style="color:var(--primary)">¥${grand.toLocaleString()}</span></div>
     </div>`;
