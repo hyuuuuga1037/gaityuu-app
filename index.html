@@ -139,6 +139,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   transition:.15s;background:white;font-weight:500;user-select:none}
 .rb:active{transform:scale(.97)}
 .rb.on{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:700}
+/* 項目数が多いオプション・ボタンは、均等伸縮せず中身の幅で自然に折り返す */
+#suit-options-rg .rb, #suit-buttons-rg .rb{flex:0 0 auto;min-width:0}
 
 /* ── SUIT SUB-SECTION ── */
 .suit-sec{border:1.5px solid #F0D0CC;border-radius:12px;padding:14px;margin-bottom:12px;background:#FFFBFA}
@@ -1621,6 +1623,7 @@ function renderSuitMeasures(area){
           <div class="rb" data-v="ストレッチ" onclick="toggleSuitOption(this)">ストレッチ</div>
           <div class="rb" data-v="ウォッシャブル" onclick="toggleSuitOption(this)">ウォッシャブル</div>
           <div class="rb" data-v="ウール100%" onclick="toggleSuitOption(this)">ウール100%</div>
+          <div class="rb" data-v="日本製" onclick="toggleSuitOption(this)">日本製</div>
           <div class="rb" data-v="ウエスト滑り止め" onclick="toggleSuitOption(this)">ウエスト滑り止め</div>
           <div class="rb" data-v="ノーカラー" onclick="toggleSuitOption(this)">ノーカラー</div>
           <div class="rb" data-v="アジャスター" onclick="toggleSuitOption(this)">アジャスター</div>
