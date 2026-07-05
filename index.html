@@ -834,6 +834,14 @@ async function toggleWork(e, itemId, type, isDone) {
 }
 
 /* ===== 採寸タブ ===== */
+// スーツ・ジャージの選択状態を初期化（前の商品の選択を持ち越さないため）
+function resetSuitState() {
+  suitType='setup'; hemType='single'; suitStyle='business'; doubleBtnCount='';
+  suitDesign={lining:'',buttons:'',vent:'',options:[]};
+  jerseyType='setup'; suitThreePiece=false;
+  const memoEl=document.getElementById('suit-design-memo'); if(memoEl) memoEl.value='';
+}
+
 function openMeasureForItem(itemId) {
   _selectedItemId = itemId;
   const item = _inventory.find(i => i.id === itemId);
@@ -848,6 +856,9 @@ function openMeasureForItem(itemId) {
     return;
   }
 
+  // 前の商品の選択状態（裾仕様・ボタン・ベント・オプション等）を持ち越さない
+  resetSuitState();
+
   // フォームに商品情報をセット
   const mgmtEl = document.getElementById('f-mgmt');
   const brandEl = document.getElementById('f-brand');
@@ -858,7 +869,7 @@ function openMeasureForItem(itemId) {
   const nameEl = document.getElementById('f-name');
   if (nameEl) { nameEl.value = item.brand||''; document.getElementById('name-cnt').textContent=(item.brand||'').length+'/40'; }
 
-  // ジャンル→カテゴリ自動選択
+  // ジャンル→カテゴリ自動選択（採寸エリアは再描画され、数値・選択とも白紙になる）
   const genreMap = { 'スーツ':'suit','靴':'shoes','バッグ':'bag','ジャージ':'jersey','洋服':'tops','デニム':'pants','その他':'tops' };
   const catId = genreMap[item.genre] || '';
   if (catId) selectCat(catId);
@@ -1257,12 +1268,35 @@ function initFirestoreDrafts() {
 }
 
 /* ===== 下書き一覧 ===== */
+// 下書きの担当者名（依頼のassignee優先、なければ在庫の担当者）。空=自分
+function draftAssigneeName(d) {
+  const a = d.assignee || _assignees[String(d.id)] || '';
+  return (a === 'A') ? '奥村' : (a === 'B') ? '相川' : a;
+}
+function _draftCardHTML(d, pendingIds, ownerBadge) {
+  return `
+    <div style="padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="min-width:0;overflow:hidden">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}${ownerBadge ? ` <span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px">${ownerBadge}さん</span>` : ''}</div>
+          <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
+          <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
+        </div>
+      </div>
+      ${d.memo
+        ? `<div onclick="editDraftMemo(${d.id})" style="cursor:pointer;margin-top:8px;padding:7px 9px;background:#EFF6FF;border:1px solid #3B82F6;border-radius:8px;font-size:12px;color:#1E40AF;white-space:pre-wrap">📝 ${d.memo}　<span style="font-size:10px;color:#3B82F6">（タップで編集）</span></div>`
+        : `<button onclick="editDraftMemo(${d.id})" style="margin-top:8px;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 作業メモを追加</button>`}
+    </div>`;
+}
+
 function renderDraftList() {
   const el = document.getElementById('draft-list');
   const cntEl = document.getElementById('draft-count');
   if (!el) return;
   const drafts = getDrafts();
-  // 担当者でフィルタリング（管理者は全件表示、外注スタッフは自分宛のみ）
   const legacyKey = currentUser === '奥村' ? 'A' : 'B';
   // 外注スタッフには「自分宛の依頼」＋「自分が作成した下書き」＋「自分の担当商品に紐づく下書き」を表示（管理者は全件）
   const filtered = currentUser === 'admin' ? drafts : drafts.filter(d => {
@@ -1277,22 +1311,23 @@ function renderDraftList() {
     return;
   }
   const pendingIds = new Set(Object.keys(_pdSaves()));
-  el.innerHTML = filtered.map(d => `
-    <div style="padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div style="min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
-          <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
-        </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
-          <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
-        </div>
-      </div>
-      ${d.memo
-        ? `<div onclick="editDraftMemo(${d.id})" style="cursor:pointer;margin-top:8px;padding:7px 9px;background:#EFF6FF;border:1px solid #3B82F6;border-radius:8px;font-size:12px;color:#1E40AF;white-space:pre-wrap">📝 ${d.memo}　<span style="font-size:10px;color:#3B82F6">（タップで編集）</span></div>`
-        : `<button onclick="editDraftMemo(${d.id})" style="margin-top:8px;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 作業メモを追加</button>`}
-    </div>`).join('');
+  const byMgmt = (a,b) => (parseInt(a.mgmt)||0) - (parseInt(b.mgmt)||0);
+
+  if (currentUser === 'admin') {
+    // 管理者：自分の下書きを上、外注さん依頼分を下に分けて表示（各セクション内は管理番号順で固定）
+    const mine = filtered.filter(d => !draftAssigneeName(d)).sort(byMgmt);
+    const theirs = filtered.filter(d => draftAssigneeName(d)).sort(byMgmt);
+    let html = '';
+    html += `<div style="font-size:12px;font-weight:700;color:var(--gray-500);margin:2px 0 6px">📂 自分の下書き（${mine.length}件）</div>`;
+    html += mine.length ? mine.map(d => _draftCardHTML(d, pendingIds, '')).join('')
+      : '<div style="color:var(--gray-400);font-size:12px;padding:4px 0 8px">自分の下書きはありません</div>';
+    html += `<div style="font-size:12px;font-weight:700;color:var(--gray-500);margin:14px 0 6px;padding-top:10px;border-top:1px dashed var(--gray-200)">👥 外注さん依頼分（${theirs.length}件）</div>`;
+    html += theirs.length ? theirs.map(d => _draftCardHTML(d, pendingIds, draftAssigneeName(d))).join('')
+      : '<div style="color:var(--gray-400);font-size:12px;padding:4px 0">依頼中の下書きはありません</div>';
+    el.innerHTML = html;
+  } else {
+    el.innerHTML = filtered.sort(byMgmt).map(d => _draftCardHTML(d, pendingIds, '')).join('');
+  }
 }
 
 // 下書きへの作業メモ（撮影マニュアルの該当箇所など）を編集
