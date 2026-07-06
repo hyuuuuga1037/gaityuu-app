@@ -290,8 +290,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
       <button class="btn btn-outline btn-sm" id="item-sort-btn" onclick="toggleItemSort()" style="flex-shrink:0;white-space:nowrap">No.↑</button>
     </div>
-    <div style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
       <button class="btn btn-outline btn-sm" id="item-ship-btn" onclick="toggleShipOnly()" style="white-space:nowrap">🚚 要発送のみ</button>
+      <span id="item-count" style="font-size:13px;font-weight:700;color:var(--gray-500)"></span>
     </div>
     <div id="items-list"></div>
     <div id="packed-section" style="margin-top:14px;display:none">
@@ -724,6 +725,8 @@ function renderItems() {
   const el = document.getElementById('items-list');
   const items = myItems();
   renderPackedItems(); // 「発送済み（取り消せます）」セクションも更新
+  const cnt = document.getElementById('item-count');
+  if (cnt) cnt.textContent = items.length + '件';
   if (!items.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>${_itemShipOnly ? '要発送の商品はありません' : (_itemSearch ? '該当する商品はありません' : '担当商品はありません')}</p></div>`;
     return;
