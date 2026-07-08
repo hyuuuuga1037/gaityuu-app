@@ -1400,6 +1400,10 @@ function loadDraftIntoForm(id) {
   _selectedItemId = null;
   renderSelectedBanner();
 
+  // 前の商品のスーツ選択状態（ボタン・ベント・オプション等）を必ず一旦リセットしてから、
+  // この下書きに保存されている値だけを上書きする（値が無い項目を前の商品のまま残さないため）
+  resetSuitState();
+
   const setVal = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v || ''; };
   setVal('f-mgmt', draft.mgmt);
   setVal('f-name', draft.name);
@@ -1417,7 +1421,7 @@ function loadDraftIntoForm(id) {
   document.querySelectorAll('.cond').forEach(x => x.classList.toggle('on', x.dataset.id === selCond));
   document.querySelectorAll('.ship').forEach(x => x.classList.toggle('on', x.dataset.id === selShip));
 
-  // スーツ・ジャージ系の状態を復元
+  // スーツ・ジャージ系の状態を復元（resetSuitStateで初期化済みなので、下書きにある値だけ上書き）
   if (draft.suitType) suitType = draft.suitType;
   if (draft.hemType) hemType = draft.hemType;
   suitStyle = draft.suitStyle || 'business';
@@ -1430,9 +1434,7 @@ function loadDraftIntoForm(id) {
       options: [...(draft.suit_design.options || [])]
     };
   }
-  if (draft.measures && typeof draft.measures.suitThreePiece !== 'undefined') {
-    suitThreePiece = !!draft.measures.suitThreePiece;
-  }
+  suitThreePiece = !!(draft.measures && draft.measures.suitThreePiece);
 
   // カテゴリ選択 → 採寸エリアを再描画してから数値を反映
   if (draft.cat) selectCat(draft.cat);
