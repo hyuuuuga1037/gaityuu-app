@@ -312,6 +312,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sec-ttl">📂 保存済み下書き（<span id="draft-count">0</span>件）</div>
       <div id="draft-list"></div>
     </div>
+    <!-- 出品完了アーカイブ（即削除せず一旦退避する中間置き場） -->
+    <div class="card" id="draft-archive-box" style="display:none">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;color:var(--gray-600)">✅ 出品完了（<span id="draft-archive-count">0</span>件）</summary>
+        <div style="font-size:11px;color:var(--gray-400);margin:6px 0 10px">出品が終わって片付けた下書きです。間違いがあれば「戻す」、不要なら「完全に削除」してください。</div>
+        <div id="draft-archive-list"></div>
+      </details>
+    </div>
     <!-- バックアップ履歴（管理者のみ・復元用） -->
     <div class="card" id="draft-history-card" style="display:none">
       <details>
@@ -1293,6 +1301,7 @@ function _draftCardHTML(d, pendingIds, ownerBadge) {
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
+          ${currentUser === 'admin' ? `<button class="btn btn-outline btn-sm" style="color:var(--success)" onclick="archiveDraft(${d.id})">✅ 出品完了</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
         </div>
       </div>
@@ -1309,12 +1318,16 @@ function renderDraftList() {
   const drafts = getDrafts();
   const legacyKey = currentUser === '奥村' ? 'A' : 'B';
   // 外注スタッフには「自分宛の依頼」＋「自分が作成した下書き」＋「自分の担当商品に紐づく下書き」を表示（管理者は全件）
-  const filtered = currentUser === 'admin' ? drafts : drafts.filter(d => {
+  const visible = currentUser === 'admin' ? drafts : drafts.filter(d => {
     if (d.fromRequest) return d.assignee === currentUser || d.assignee === legacyKey;
     if (d.createdBy === currentUser) return true;
     const a = _assignees[String(d.id)] || ''; // 下書きIDに対応する在庫の担当者
     return a === currentUser || a === legacyKey;
   });
+  // 出品完了（アーカイブ）は通常一覧から除外し、下の折りたたみに表示
+  const filtered = visible.filter(d => !d.archived);
+  const archived = visible.filter(d => d.archived);
+  renderDraftArchive(archived);
   if (cntEl) cntEl.textContent = filtered.length;
   if (!filtered.length) {
     el.innerHTML = '<div style="color:var(--gray-400);text-align:center;padding:16px;font-size:13px">保存された下書きはありません</div>';
@@ -1338,6 +1351,51 @@ function renderDraftList() {
   } else {
     el.innerHTML = filtered.sort(byMgmt).map(d => _draftCardHTML(d, pendingIds, '')).join('');
   }
+}
+
+// 出品完了（アーカイブ）：即削除せず一旦ここに退避し、後から安全に確認・完全削除できる
+function renderDraftArchive(archived) {
+  const box = document.getElementById('draft-archive-box');
+  const list = document.getElementById('draft-archive-list');
+  const cnt = document.getElementById('draft-archive-count');
+  if (!box || !list) return;
+  if (!archived.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  if (cnt) cnt.textContent = archived.length;
+  const sorted = archived.slice().sort((a,b) => (b.archivedAt||'').localeCompare(a.archivedAt||''));
+  list.innerHTML = sorted.map(d => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
+      <div style="min-width:0;overflow:hidden">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${d.archivedAt ? new Date(d.archivedAt).toLocaleString('ja-JP') + ' 出品完了' : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-outline btn-sm" onclick="unarchiveDraft(${d.id})">↩️ 戻す</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="deleteDraftConfirm(${d.id})">完全に削除</button>
+      </div>
+    </div>`).join('');
+}
+
+// 出品が完了した下書きをアーカイブへ（即削除しない安全な退避）
+function archiveDraft(id) {
+  const d = getDrafts().find(x => x.id === id);
+  if (!d) return;
+  if (!confirm('出品完了として、この下書きを一覧から片付けますか？\n（すぐには削除されず、アーカイブから後で確認・完全削除できます）')) return;
+  saveDraftDoc({ ...d, archived: true, archivedAt: new Date().toISOString(), savedAt: new Date().toISOString() });
+  _rebuildDrafts();
+  renderDraftList();
+  showToast('✅ 出品完了として片付けました');
+}
+
+// アーカイブから通常の下書き一覧へ戻す
+function unarchiveDraft(id) {
+  const d = getDrafts().find(x => x.id === id);
+  if (!d) return;
+  const { archived, archivedAt, ...rest } = d;
+  saveDraftDoc({ ...rest, savedAt: new Date().toISOString() });
+  _rebuildDrafts();
+  renderDraftList();
+  showToast('↩️ 下書き一覧に戻しました');
 }
 
 // 下書きへの作業メモ（撮影マニュアルの該当箇所など）を編集
