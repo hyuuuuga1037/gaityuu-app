@@ -1294,12 +1294,16 @@ function _draftCardHTML(d, pendingIds, ownerBadge) {
   const catLabel = draftCatLabel(d);
   return `
     <div style="padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div style="min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${catLabel ? `<span style="font-size:11px;font-weight:700;color:#0369A1;background:#E0F2FE;border-radius:6px;padding:1px 6px;margin-right:4px">${catLabel}</span>` : ''}${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}${ownerBadge ? ` <span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px">${ownerBadge}さん</span>` : ''}</div>
+      ${(catLabel || ownerBadge) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
+        ${catLabel ? `<span style="font-size:11px;font-weight:700;color:#0369A1;background:#E0F2FE;border-radius:6px;padding:1px 6px;white-space:nowrap">${catLabel}</span>` : ''}
+        ${ownerBadge ? `<span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px;white-space:nowrap">${ownerBadge}さん</span>` : ''}
+      </div>` : ''}
+      <div>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px;overflow-wrap:break-word">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
           <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
           <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
           ${currentUser === 'admin' ? `<button class="btn btn-outline btn-sm" style="color:var(--success)" onclick="archiveDraft(${d.id})">✅ 出品完了</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
