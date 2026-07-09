@@ -614,9 +614,9 @@ function initData() {
 }
 
 function defaultRates() {
-  const genres = ['スーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   const shoot = {};
-  genres.forEach(g => shoot[g] = g === 'スーツ' ? 200 : g === 'アクセサリー' ? 100 : 150);
+  genres.forEach(g => shoot[g] = (g === 'スーツ' || g === 'レディーススーツ') ? 200 : g === 'アクセサリー' ? 100 : 150);
   return {
     奥村: { shoot: {...shoot}, pack: 100, spaceEnabled: true,  spaceAmount: 0 },
     相川: { shoot: {...shoot}, pack: 100, spaceEnabled: false, spaceAmount: 0 }
@@ -1122,7 +1122,7 @@ function renderExtraChargesList() {
 function renderAdminSettings() {
   const el = document.getElementById('admin-settings-content');
   const rates = _rates || defaultRates();
-  const genres = ['スーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   el.innerHTML = ['奥村','相川'].map(person => `
     <div class="card">
       <div class="card-title">${person}さんの単価</div>
@@ -1168,7 +1168,7 @@ function renderAdminSettings() {
 }
 
 async function saveRates() {
-  const genres = ['スーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   const newRates = {};
   ['奥村','相川'].forEach(person => {
     newRates[person] = { shoot:{}, pack:0 };
@@ -1215,7 +1215,7 @@ const SHIPPING = [
   {id:'other',   name:'その他・未定',       icon:'📬',tags:[]},
 ];
 const MEASURES = {
-  bag:  [{k:'縦',u:'cm',req:true},{k:'横',u:'cm',req:true},{k:'奥行き',u:'cm',req:true},{k:'持ち手の長さ',u:'cm',req:false},{k:'ショルダー紐',u:'cm',req:false}],
+  bag:  [{k:'縦',u:'cm',req:true},{k:'横（上部）',u:'cm',req:true},{k:'横（下部）',u:'cm',req:true},{k:'マチ',u:'cm',req:true},{k:'持ち手の長さ',u:'cm',req:false},{k:'ショルダー紐',u:'cm',req:false}],
   tops: [{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:true},{k:'着丈',u:'cm',req:true}],
   one:  [{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:false},{k:'着丈',u:'cm',req:true},{k:'スカート丈',u:'cm',req:false}],
   pants:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'股上',u:'cm',req:true},{k:'股下',u:'cm',req:true},{k:'わたり幅',u:'cm',req:false},{k:'裾幅',u:'cm',req:false}],
@@ -1276,12 +1276,19 @@ function draftAssigneeName(d) {
   const a = d.assignee || _assignees[String(d.id)] || '';
   return (a === 'A') ? '奥村' : (a === 'B') ? '相川' : a;
 }
+// 下書きのカテゴリ表示ラベル（例:「スーツ」「レディーススーツ」「バッグ」）
+const DRAFT_CAT_LABELS = { bag:'バッグ', tops:'洋服', pants:'デニム', shoes:'靴', jersey:'ジャージ' };
+function draftCatLabel(d) {
+  if (d.cat === 'suit') return d.suitStyle === 'ladies' ? 'レディーススーツ' : 'スーツ';
+  return DRAFT_CAT_LABELS[d.cat] || '';
+}
 function _draftCardHTML(d, pendingIds, ownerBadge) {
+  const catLabel = draftCatLabel(d);
   return `
     <div style="padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <div style="min-width:0;overflow:hidden">
-          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}${ownerBadge ? ` <span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px">${ownerBadge}さん</span>` : ''}</div>
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${catLabel ? `<span style="font-size:11px;font-weight:700;color:#0369A1;background:#E0F2FE;border-radius:6px;padding:1px 6px;margin-right:4px">${catLabel}</span>` : ''}${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}${ownerBadge ? ` <span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px">${ownerBadge}さん</span>` : ''}</div>
           <div style="font-size:11px;color:var(--gray-400)">${d.savedAt ? new Date(d.savedAt).toLocaleString('ja-JP') : ''}${pendingIds.has(String(d.id)) ? ' <span style="color:#F59E0B">⏳ 送信待ち</span>' : ''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
