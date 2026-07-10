@@ -1373,10 +1373,10 @@ function renderDraftArchive(archived) {
         <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.mgmt ? 'No.'+d.mgmt+' ' : ''}${d.brand||''} ${d.name||''}</div>
         <div style="font-size:11px;color:var(--gray-400)">${d.archivedAt ? new Date(d.archivedAt).toLocaleString('ja-JP') + ' 出品完了' : ''}</div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      ${currentUser === 'admin' ? `<div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-outline btn-sm" onclick="unarchiveDraft(${d.id})">↩️ 戻す</button>
         <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="deleteDraftConfirm(${d.id})">完全に削除</button>
-      </div>
+      </div>` : ''}
     </div>`).join('');
 }
 
@@ -1412,6 +1412,7 @@ function autoCheckShootForDraft(draft) {
 
 // アーカイブから通常の下書き一覧へ戻す
 function unarchiveDraft(id) {
+  if (currentUser !== 'admin') return;
   const d = getDrafts().find(x => x.id === id);
   if (!d) return;
   const { archived, archivedAt, ...rest } = d;
