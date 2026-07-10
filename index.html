@@ -1306,7 +1306,7 @@ function _draftCardHTML(d, pendingIds, ownerBadge) {
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
           <button class="btn btn-outline-primary btn-sm" onclick="loadDraftIntoForm(${d.id})">開く</button>
           ${currentUser === 'admin' ? `<button class="btn btn-outline btn-sm" style="color:var(--success)" onclick="archiveDraft(${d.id})">✅ 出品完了</button>` : ''}
-          <button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>
+          ${currentUser === 'admin' ? `<button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>` : ''}
         </div>
       </div>
       ${d.memo
@@ -1382,13 +1382,32 @@ function renderDraftArchive(archived) {
 
 // 出品が完了した下書きをアーカイブへ（即削除しない安全な退避）
 function archiveDraft(id) {
+  // 出品完了・削除は管理者のみの操作（メルカリへの投稿・転記は常に管理者が行うため）
+  if (currentUser !== 'admin') return;
   const d = getDrafts().find(x => x.id === id);
   if (!d) return;
-  if (!confirm('出品完了として、この下書きを一覧から片付けますか？\n（すぐには削除されず、アーカイブから後で確認・完全削除できます）')) return;
+  if (!confirm('出品完了として、この下書きを一覧から片付けますか？\n（担当の外注さんの撮影採寸チェックも自動でONになります）')) return;
   saveDraftDoc({ ...d, archived: true, archivedAt: new Date().toISOString(), savedAt: new Date().toISOString() });
   _rebuildDrafts();
   renderDraftList();
+  autoCheckShootForDraft(d); // 担当の外注さんの撮影採寸チェックを自動でON（未記録の場合のみ・報酬計上漏れ防止）
   showToast('✅ 出品完了として片付けました');
+}
+
+// 下書きに紐づく在庫商品の担当外注さんの撮影採寸を自動チェック（既に記録済みなら何もしない）
+function autoCheckShootForDraft(draft) {
+  const item = _inventory.find(i => i.id === draft.id);
+  if (!item) return; // 在庫商品に紐づかない下書き（手動作成メモ等）は対象外
+  const name = draftAssigneeName(draft);
+  if (name !== '奥村' && name !== '相川') return; // 担当者不明・自分担当は対象外
+  const already = _workRecords.some(r => r.itemId === item.id && r.type === 'shoot' && r.assignee === name);
+  if (already) return;
+  const rates = _rates || defaultRates();
+  const unitPrice = (rates[name] && rates[name].shoot && rates[name].shoot[item.genre]) || 150;
+  const record = { itemId: item.id, type: 'shoot', date: new Date().toISOString().slice(0,10), unitPrice, assignee: name, createdAt: new Date().toISOString() };
+  db.collection('work_records').add(record)
+    .then(() => showToast(`📷 ${name}さんの撮影採寸を記録しました`))
+    .catch(e => console.error('撮影採寸の自動記録エラー:', e));
 }
 
 // アーカイブから通常の下書き一覧へ戻す
@@ -1541,6 +1560,8 @@ function loadDraftIntoForm(id) {
 }
 
 function deleteDraftConfirm(id) {
+  // 削除は管理者のみの操作
+  if (currentUser !== 'admin') return;
   if (!confirm('この下書きを削除しますか？')) return;
   // 保存待ちから除去し、削除待ちに登録（送信失敗しても再送し続ける）
   const ps = _pdSaves(); delete ps[String(id)]; _setPdSaves(ps);
