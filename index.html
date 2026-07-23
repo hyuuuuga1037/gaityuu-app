@@ -1229,7 +1229,7 @@ const MEASURES = {
   pants:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'股上',u:'cm',req:true},{k:'股下',u:'cm',req:true},{k:'わたり幅',u:'cm',req:false},{k:'裾幅',u:'cm',req:false}],
   skirt:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'丈',u:'cm',req:true},{k:'裾幅',u:'cm',req:false}],
   outer:[{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:true},{k:'着丈',u:'cm',req:true}],
-  shoes:[{k:'サイズ',u:'cm',req:true},{k:'インソール長',u:'cm',req:false},{k:'足幅',u:'cm',req:false},{k:'ヒールの高さ',u:'cm',req:false}],
+  shoes:'special_shoes',
   suit:'special', jersey:'special_jersey',
 };
 
@@ -1703,6 +1703,7 @@ function renderMeasures(){
   if(!schema){area.innerHTML='<div style="color:var(--gray-400);text-align:center;padding:20px;font-size:13px">↑ カテゴリを選択してください</div>';return;}
   if(schema==='special'){renderSuitMeasures(area);return;}
   if(schema==='special_jersey'){renderJerseyMeasures(area);return;}
+  if(schema==='special_shoes'){renderShoesMeasures(area);return;}
   area.innerHTML=schema.map(m=>`
     <div class="mr">
       <div class="ml">${m.k}<small>${m.req?'':'任意'}</small></div>
@@ -1885,6 +1886,12 @@ function setSuitStyle(v){
   if(v==='ladies'){ if(lbl) lbl.textContent='3点セット'; if(btn) btn.textContent='3点（スカート付き）'; }
   else { if(lbl) lbl.textContent='スリーピース'; if(btn) btn.textContent='3ピース（ベスト付き）'; }
   updateThreePieceSections();
+}
+function renderShoesMeasures(area){
+  area.innerHTML=`
+    <div class="mr"><div class="ml">サイズ</div><div class="mw"><input type="number" id="m-サイズ" placeholder="例：35.5" step="0.5" min="0"><span class="mu">cm</span></div></div>
+    <div class="mr"><div class="ml">ヒールの高さ<small>任意</small></div><div class="mw"><input type="number" id="m-ヒールの高さ" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
+    <div class="mr"><div class="ml">カラー</div><div class="mw"><input type="text" id="m-カラー" placeholder="例：ブラック 黒" style="width:150px"></div></div>`;
 }
 function renderJerseyMeasures(area){
   area.innerHTML=`
@@ -2096,6 +2103,32 @@ function buildSuitText(brand,size,mgmt){
   return L;
 }
 
+// シューズ（パンプス等）専用の説明文
+function buildShoesText(brand, mgmt){
+  const L=[]; const push=(...xs)=>xs.forEach(x=>L.push(x));
+  const name=fv('f-name');                 // 商品詳細＝アイテム
+  const color=fv('m-カラー');               // カラー欄
+  const sizeM=fm('m-サイズ'), sizeH=fv('f-size');
+  const size = sizeM>0 ? String(sizeM) : sizeH; // 採寸サイズ優先、無ければ表記サイズ
+  const heel=fm('m-ヒールの高さ');
+  push('コメントなしの即購入、歓迎です！','');
+  push('・匿名配送、簡易梱包にてお届け','');
+  push('■その他、同サイズの靴はこちらから！','#ひなたパンプス','');
+  push('■ブランド'); if(brand) brand.split('\n').map(s=>s.trim()).filter(Boolean).forEach(b=>push(b)); push('');
+  push('■アイテム'); if(name) push(name); push('');
+  if(color){ push('■カラー'); push(color); push(''); }
+  push('■サイズ'); if(size) push(size); push('');
+  if(heel>0){ push('■ヒールの高さ'); push(heel+'cm'); push(''); }
+  push('■商品の状態');
+  push('使用感の目立たない美品です♪');
+  push('写真にてご確認ください。');
+  push('気になる点などございましたら、お気軽にコメントください！','');
+  push('即日、匿名、簡易梱包にて発送いたします。');
+  push('中古品であることをご理解の上お取引お願い致します。');
+  if(mgmt){ push('', String(mgmt)); }
+  return L;
+}
+
 function generateText(){
   const name=fv('f-name'),brand=fv('f-brand'),size=fv('f-size'),mgmt=fv('f-mgmt'),appeal=fv('f-appeal'),tags=fv('f-tags'),price=fv('f-price');
   const condObj=CONDITIONS.find(c=>c.id===selCond);
@@ -2107,7 +2140,9 @@ function generateText(){
   if(condObj) lines.push(`【商品の状態】${condObj.name}`);
   lines.push('');
   const schema=MEASURES[selCat];
-  if(schema&&schema!=='special'&&schema!=='special_jersey'&&selCat){
+  if(selCat==='shoes'){
+    lines = buildShoesText(brand, mgmt);
+  } else if(schema&&schema!=='special'&&schema!=='special_jersey'&&schema!=='special_shoes'&&selCat){
     lines.push('■ 採寸データ（平置き実寸）');
     schema.forEach(ms=>{ const val=fm('m-'+ms.k); if(val>0) lines.push(`${ms.k}：${val}cm`); });
     lines.push('');
@@ -2128,11 +2163,11 @@ function generateText(){
     }
     lines.push('');
   }
-  if(appeal&&selCat!=='suit'){lines.push('■ アピールポイント・状態の詳細');lines.push(appeal);lines.push('');}
-  if(shipObj) lines.push(`【配送方法】${shipObj.name}`);
-  if(price)   lines.push(`【価格】¥${Number(price).toLocaleString()}`);
-  if(mgmt&&selCat!=='suit') lines.push(`【管理番号】${mgmt}`);
-  if(tags){lines.push('');lines.push(tags);}
+  if(appeal&&selCat!=='suit'&&selCat!=='shoes'){lines.push('■ アピールポイント・状態の詳細');lines.push(appeal);lines.push('');}
+  if(shipObj&&selCat!=='shoes') lines.push(`【配送方法】${shipObj.name}`);
+  if(price&&selCat!=='shoes')   lines.push(`【価格】¥${Number(price).toLocaleString()}`);
+  if(mgmt&&selCat!=='suit'&&selCat!=='shoes') lines.push(`【管理番号】${mgmt}`);
+  if(tags&&selCat!=='shoes'){lines.push('');lines.push(tags);}
   genText=lines.join('\n');
   if(!genText.trim()){showToast('⚠️ 商品情報を入力してください');return;}
   document.getElementById('gen-preview').textContent=genText;
@@ -2182,6 +2217,9 @@ function collectMeasures(){
       so_hyoki:fv('so-hyoki'),so_sozo:fm('so-sozo'),so_kata:fm('so-kata'),so_mimi:fm('so-mimi'),so_sode:fm('so-sode'),so_waist:fm('so-waist'),
       suitThreePiece, ladiesBottom,
     };
+  }
+  if(schema==='special_shoes'){
+    return { 'サイズ':fm('m-サイズ'), 'ヒールの高さ':fm('m-ヒールの高さ'), 'カラー':fv('m-カラー') };
   }
   if(schema==='special_jersey'){
     const collarEl=document.getElementById('jj-collar');
