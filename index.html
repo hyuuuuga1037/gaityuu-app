@@ -353,6 +353,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="fl">表記サイズ <span class="opt">任意</span></div>
         <input type="text" id="f-size" placeholder="例：M、L、XL、38、170/88A">
       </div>
+      <div class="fg" id="f-color-row" style="display:none">
+        <div class="fl">カラー <span class="opt">任意</span></div>
+        <input type="text" id="f-color" placeholder="例：ブラック 黒">
+      </div>
       <div class="fg">
         <div class="fl">商品の状態</div>
         <div class="cond-grid" id="cond-grid"></div>
@@ -1504,6 +1508,7 @@ function loadDraftIntoForm(id) {
   setVal('f-name', draft.name);
   setVal('f-brand', draft.brand);
   setVal('f-size', draft.size);
+  setVal('f-color', draft.color);
   setVal('f-appeal', draft.appeal);
   setVal('f-tags', draft.tags);
   setVal('f-price', draft.price);
@@ -1691,6 +1696,7 @@ function selectCat(id){
   selCat=id;
   document.querySelectorAll('.cat-btn').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
   renderMeasures();
+  const colorRow=document.getElementById('f-color-row'); if(colorRow) colorRow.style.display=(id==='shoes')?'block':'none';
   if(id==='suit'){
     const appealEl=document.getElementById('f-appeal');
     if(appealEl&&!appealEl.value.trim()) appealEl.value='全体的に使用感が少なく状態良好です！\nまだまだご使用いただけます。';
@@ -1889,9 +1895,8 @@ function setSuitStyle(v){
 }
 function renderShoesMeasures(area){
   area.innerHTML=`
-    <div class="mr"><div class="ml">サイズ</div><div class="mw"><input type="number" id="m-サイズ" placeholder="例：35.5" step="0.5" min="0"><span class="mu">cm</span></div></div>
     <div class="mr"><div class="ml">ヒールの高さ<small>任意</small></div><div class="mw"><input type="number" id="m-ヒールの高さ" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>
-    <div class="mr"><div class="ml">カラー</div><div class="mw"><input type="text" id="m-カラー" placeholder="例：ブラック 黒" style="width:150px"></div></div>`;
+    <div style="font-size:11px;color:var(--gray-400);margin-top:6px">※サイズは上の「表記サイズ」、カラーは「基本情報」の欄に入力してください</div>`;
 }
 function renderJerseyMeasures(area){
   area.innerHTML=`
@@ -2107,9 +2112,8 @@ function buildSuitText(brand,size,mgmt){
 function buildShoesText(brand, mgmt){
   const L=[]; const push=(...xs)=>xs.forEach(x=>L.push(x));
   const name=fv('f-name');                 // 商品詳細＝アイテム
-  const color=fv('m-カラー');               // カラー欄
-  const sizeM=fm('m-サイズ'), sizeH=fv('f-size');
-  const size = sizeM>0 ? String(sizeM) : sizeH; // 採寸サイズ優先、無ければ表記サイズ
+  const color=fv('f-color');               // カラー欄（基本情報）
+  const size=fv('f-size');                 // 表記サイズ
   const heel=fm('m-ヒールの高さ');
   push('コメントなしの即購入、歓迎です！','');
   push('・匿名配送、簡易梱包にてお届け','');
@@ -2196,7 +2200,7 @@ function collectFormData(){
   return {
     cat:selCat,cond:selCond,ship:selShip,
     mgmt:fv('f-mgmt'),name:fv('f-name'),brand:fv('f-brand'),
-    size:fv('f-size'),appeal:fv('f-appeal'),tags:fv('f-tags'),price:fv('f-price'),
+    size:fv('f-size'),color:fv('f-color'),appeal:fv('f-appeal'),tags:fv('f-tags'),price:fv('f-price'),
     suitType,hemType,suitStyle,doubleBtnCount,
     suit_design:selCat==='suit'?{...suitDesign,options:[...suitDesign.options],memo:fv('suit-design-memo')}:null,
     measures:collectMeasures(),
@@ -2219,7 +2223,7 @@ function collectMeasures(){
     };
   }
   if(schema==='special_shoes'){
-    return { 'サイズ':fm('m-サイズ'), 'ヒールの高さ':fm('m-ヒールの高さ'), 'カラー':fv('m-カラー') };
+    return { 'ヒールの高さ':fm('m-ヒールの高さ') };
   }
   if(schema==='special_jersey'){
     const collarEl=document.getElementById('jj-collar');
@@ -2250,7 +2254,7 @@ function saveDraft(){
 }
 
 function resetMeasureForm(silent){
-  ['f-mgmt','f-name','f-brand','f-size','f-appeal','f-tags','f-price'].forEach(id=>{
+  ['f-mgmt','f-name','f-brand','f-size','f-color','f-appeal','f-tags','f-price'].forEach(id=>{
     const el=document.getElementById(id);if(el) el.value='';
   });
   document.getElementById('name-cnt').textContent='0/40';
