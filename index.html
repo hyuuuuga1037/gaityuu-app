@@ -1982,6 +1982,8 @@ function suitOptionLines(){
   suitDesign.options.forEach(o=>{
     if(o==='ノーカラー'){ out.push('ノーカラージャケット'); out.push('カラーレスジャケット'); }
     else if(o==='アジャスター'){ out.push('ウエストアジャスター'); out.push('ウエスト調整'); }
+    else if(o==='ストレッチ'){ out.push('ストレッチ 伸縮性'); }
+    else if(o==='ウォッシャブル'){ out.push('ウォッシャブル 洗える 洗濯可'); }
     else out.push(o);
   });
   return out;
