@@ -867,7 +867,7 @@ async function toggleWork(e, itemId, type, isDone) {
 function resetSuitState() {
   suitType='setup'; hemType='single'; suitStyle='business'; doubleBtnCount='';
   suitDesign={lining:'',buttons:'',vent:'',options:[]};
-  jerseyType='setup'; suitThreePiece=false; ladiesBottom='pants';
+  jerseyType='setup'; suitThreePiece=false; ladiesBottom='skirt';
   const memoEl=document.getElementById('suit-design-memo'); if(memoEl) memoEl.value='';
 }
 
@@ -1257,7 +1257,7 @@ let suitStyle='business'; // business/formal/vintage/ladies（スーツの種類
 let doubleBtnCount=''; // ダブル選択時の 4つボタン / 6つボタン
 let suitDesign={lining:'',buttons:'',vent:'',options:[]};
 let jerseyType='setup', suitThreePiece=false;
-let ladiesBottom='pants'; // レディース3点セットの下衣：skirt=スカート / onepiece=ワンピース
+let ladiesBottom='skirt'; // レディース3点セットの下衣：skirt=スカート / onepiece=ワンピース
 let genText='';
 let _currentDraftId = null;
 
@@ -1574,7 +1574,7 @@ function loadDraftIntoForm(id) {
     if (selCat === 'suit') {
       // 3ピース/下衣種別は selectCat→renderSuitMeasures でリセットされるため、ここで下書きから再適用する
       suitThreePiece = !!(draft.measures && draft.measures.suitThreePiece);
-      ladiesBottom = (draft.measures && draft.measures.ladiesBottom) || 'pants';
+      ladiesBottom = (draft.measures && draft.measures.ladiesBottom) || 'skirt';
       setSuitStyle(suitStyle);
       setSuitType(suitType);
       setHemType(hemType);
@@ -1783,13 +1783,12 @@ function renderSuitMeasures(area){
         <div class="mw"><input type="number" id="sp-fold" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div>
       </div>
     </div></div>
-    <div class="fg" id="three-piece-row" style="margin-bottom:4px"><div class="fl" id="three-piece-label">スリーピース</div>
+    <div class="fg" style="margin-bottom:4px"><div class="fl" id="three-piece-label">スリーピース</div>
       <div class="rg"><div class="rb" id="three-piece-btn" onclick="setSuitThreePiece()">3ピース（ベスト付き）</div></div>
     </div>
-    <div class="fg" id="ladies-bottom-row" style="display:none;margin-bottom:4px"><div class="fl">ボトム（下衣）</div>
+    <div class="fg" id="ladies-bottom-row" style="display:none;margin-bottom:4px"><div class="fl">下衣の種類</div>
       <div class="rg" id="ladies-bottom-rg">
-        <div class="rb on" data-v="pants" onclick="setLadiesBottom('pants')">パンツ</div>
-        <div class="rb" data-v="skirt" onclick="setLadiesBottom('skirt')">スカート</div>
+        <div class="rb on" data-v="skirt" onclick="setLadiesBottom('skirt')">スカート</div>
         <div class="rb" data-v="onepiece" onclick="setLadiesBottom('onepiece')">ワンピース</div>
       </div>
     </div>
@@ -1854,32 +1853,10 @@ function renderSuitMeasures(area){
 function setSuitType(v){
   suitType=v;
   document.querySelectorAll('#suit-type-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  updateSuitSections();
-}
-// スーツ各セクションの表示切替を一元管理（ジャケット/パンツ/スカート/ワンピース/ベスト/ボトム選択）
-function updateSuitSections(){
-  const isLadies = suitStyle==='ladies';
   const jSec=document.getElementById('suit-jacket-sec');
   const pSec=document.getElementById('suit-pants-sec');
-  const skirt=document.getElementById('suit-skirt-sec');
-  const one=document.getElementById('suit-onepiece-sec');
-  const vest=document.getElementById('suit-vest-sec');
-  const lbRow=document.getElementById('ladies-bottom-row');
-  const tpRow=document.getElementById('three-piece-row');
-  // ジャケット
-  if(jSec) jSec.style.display=(suitType==='pants_only')?'none':'block';
-  // 3ピース(ベスト)はメンズのみ
-  if(tpRow) tpRow.style.display=isLadies?'none':'flex';
-  // レディースはボトム種別を選択（ジャケット単品以外）
-  if(lbRow) lbRow.style.display=(isLadies && suitType!=='jacket')?'flex':'none';
-  // パンツ：ジャケット単品でなく、かつ（メンズ or レディースでボトム=パンツ）
-  const showPants = suitType!=='jacket' && (!isLadies || ladiesBottom==='pants');
-  if(pSec) pSec.style.display=showPants?'block':'none';
-  // スカート／ワンピース：レディースで該当ボトムを選択時
-  if(skirt) skirt.style.display=(isLadies && suitType!=='jacket' && ladiesBottom==='skirt')?'block':'none';
-  if(one)   one.style.display=(isLadies && suitType!=='jacket' && ladiesBottom==='onepiece')?'block':'none';
-  // ベスト：メンズ3ピースのみ
-  if(vest) vest.style.display=(suitThreePiece && !isLadies && suitType!=='pants_only')?'block':'none';
+  if(jSec) jSec.style.display=(v==='pants_only')?'none':'block';
+  if(pSec) pSec.style.display=(v==='jacket')?'none':'block';
 }
 function setHemType(v){
   hemType=v;
@@ -1892,7 +1869,17 @@ function setSuitThreePiece(){
   const btn=document.getElementById('three-piece-btn'); if(btn) btn.classList.toggle('on',suitThreePiece);
   updateThreePieceSections();
 }
-function updateThreePieceSections(){ updateSuitSections(); }
+function updateThreePieceSections(){
+  const isLadies=suitStyle==='ladies';
+  const vest=document.getElementById('suit-vest-sec');
+  const skirt=document.getElementById('suit-skirt-sec');
+  const one=document.getElementById('suit-onepiece-sec');
+  const lbRow=document.getElementById('ladies-bottom-row');
+  if(vest) vest.style.display=(suitThreePiece&&!isLadies)?'block':'none';
+  if(lbRow) lbRow.style.display=(suitThreePiece&&isLadies)?'flex':'none';
+  if(skirt) skirt.style.display=(suitThreePiece&&isLadies&&ladiesBottom==='skirt')?'block':'none';
+  if(one)   one.style.display=(suitThreePiece&&isLadies&&ladiesBottom==='onepiece')?'block':'none';
+}
 function setLadiesBottom(v){
   ladiesBottom=v;
   document.querySelectorAll('#ladies-bottom-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
@@ -2042,37 +2029,29 @@ function suitSizeBlock(size){
     L.push('身幅：'+fcm('sj-mimi')); L.push('袖丈：'+fcm('sj-sode'));
   }
   const isLadies = suitStyle==='ladies';
-  // ベストのデータ有無（メンズ3ピース）
+  // ベスト・スカート・ワンピースは「データが入っていれば」出力する（3ピースボタンを押し直さなくてもコピーに反映される）
   const hasVest = fm('sv-take')>0||fm('sv-kata')>0||fm('sv-mimi')>0;
-  // レディースのボトム採寸データ有無（旧下書きの復元補正用）
   const hasSkirt = !!fv('sk-hyoki')||fm('sk-waist')>0||fm('sk-hip')>0||fm('sk-take')>0;
   const hasOne = !!fv('so-hyoki')||fm('so-sozo')>0||fm('so-kata')>0||fm('so-mimi')>0||fm('so-sode')>0||fm('so-waist')>0;
   const hasPants = fm('sp-waist')>0||fm('sp-sozo')>0||fm('sp-watari')>0||fm('sp-hem')>0||fm('sp-inseam')>0;
-  // ベスト（メンズ3ピースのみ）
   if((suitThreePiece||hasVest) && !isLadies && st!=='pants_only'){
     L.push(''); L.push('・ベスト');
     L.push('着丈：'+fcm('sv-take')); L.push('肩幅：'+fcm('sv-kata')); L.push('身幅：'+fcm('sv-mimi'));
   }
-  // レディースのボトム種別を決定（選択を優先。旧データはデータ有無で補正）
-  let ladiesKind = 'pants';
-  if(isLadies){
-    if(ladiesBottom==='onepiece' || (hasOne && !hasPants && !hasSkirt)) ladiesKind='onepiece';
-    else if(ladiesBottom==='skirt' || (hasSkirt && !hasPants)) ladiesKind='skirt';
-    else ladiesKind='pants';
-  }
-  if(isLadies && ladiesKind==='onepiece'){
+  if(isLadies && ((suitThreePiece&&ladiesBottom==='onepiece')||hasOne)){
     L.push(''); L.push('・ワンピース');
     const sh=fv('so-hyoki'); if(sh) L.push('表記：'+sh);
     L.push('総丈：'+fcm('so-sozo')); L.push('肩幅：'+fcm('so-kata'));
     L.push('身幅（脇下）：'+fcm('so-mimi')); L.push('袖丈：'+fcm('so-sode'));
     L.push('ウエスト（1番細い部分）：'+fcm('so-waist'));
-  } else if(isLadies && ladiesKind==='skirt'){
+  } else if(isLadies && ((suitThreePiece&&ladiesBottom==='skirt')||hasSkirt)){
     L.push(''); L.push('・スカート');
     const sh=fv('sk-hyoki'); if(sh) L.push('表記：'+sh);
     L.push('ウエスト：'+fcm('sk-waist')); L.push('ヒップ：'+fcm('sk-hip')); L.push('丈：'+fcm('sk-take'));
   }
-  // パンツ：ジャケット単品でなく、かつ（メンズ or レディースでボトム=パンツ）
-  if(st!=='jacket' && (!isLadies || ladiesKind==='pants')){
+  // ワンピース構成のときはパンツを出さない。さらにレディースはパンツ未入力（空欄）ならパンツを出さない（スカートスーツ対応）
+  const onePieceActive = isLadies && ((suitThreePiece&&ladiesBottom==='onepiece')||hasOne);
+  if(st!=='jacket' && !onePieceActive && (!isLadies || hasPants)){
     L.push(''); L.push('・パンツ');
     if(size) L.push('表記：'+size);
     L.push('ウエスト：'+suitWaistText()); L.push('総丈：'+fcm('sp-sozo'));
@@ -2313,7 +2292,7 @@ function resetMeasureForm(silent){
     '<div style="color:var(--gray-400);text-align:center;padding:20px;font-size:13px">↑ カテゴリを選択すると採寸項目が表示されます</div>';
   suitType='setup';hemType='single';suitStyle='business';doubleBtnCount='';
   suitDesign={lining:'',buttons:'',vent:'',options:[]};
-  jerseyType='setup';suitThreePiece=false;ladiesBottom='pants';
+  jerseyType='setup';suitThreePiece=false;ladiesBottom='skirt';
   genText='';_currentDraftId=null;_selectedItemId=null;
   if(!silent) showToast('🔄 リセットしました');
 }
