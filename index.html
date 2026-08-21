@@ -401,7 +401,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="fg">
       <select id="admin-filter-assignee" onchange="renderAdminItems()">
         <option value="">全担当者</option>
-        <option value="奥村">奥村さん</option>
+        <option value="奥村">奥山さん</option>
         <option value="相川">相川さん</option>
       </select>
     </div>
@@ -416,7 +416,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div>
           <div style="font-size:11px;color:var(--gray-400);margin-bottom:3px">対象者</div>
           <select id="ec-person" style="padding:8px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px;font-family:inherit">
-            <option value="奥村">奥村さん</option>
+            <option value="奥村">奥山さん</option>
             <option value="相川">相川さん</option>
           </select>
         </div>
@@ -529,7 +529,7 @@ function startApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('open');
   document.getElementById('hdr-user').textContent =
-    currentUser === 'admin' ? '管理者モード' : currentUser + 'さん';
+    currentUser === 'admin' ? '管理者モード' : wName(currentUser) + 'さん';
 
   const isAdmin = currentUser === 'admin';
   document.getElementById('worker-tabs').style.display = isAdmin ? 'none' : 'flex';
@@ -999,7 +999,7 @@ function renderAdminItems() {
     const hasShoot = _workRecords.some(r => r.itemId===item.id && r.type==='shoot');
     const hasPack  = _workRecords.some(r => r.itemId===item.id && r.type==='pack');
     const a = _assignees[String(item.id)] || item.assignee || '';
-    const assigneeLabel = (a==='奥村'||a==='A')?'奥村さん':(a==='相川'||a==='B')?'相川さん':'自分';
+    const assigneeLabel = (a==='奥村'||a==='A')?'奥山さん':(a==='相川'||a==='B')?'相川さん':'自分';
     const stClass = item.status==='listed'?'badge-listed':'badge-unlisted';
     const stLabel = {unlisted:'未出品',listed:'出品中'}[item.status||'unlisted'];
     return `
@@ -1064,12 +1064,12 @@ function renderAdminSummary() {
     return `
     <div class="card">
       <div style="font-size:15px;font-weight:700;margin-bottom:12px">${y}年${parseInt(m)}月</div>
-      <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">奥村さん</div>
+      <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">奥山さん</div>
       <div class="month-row"><span>📷 撮影採寸（${ok.shootCnt}件）</span><span>¥${ok.shoot.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${ok.packCnt}件）</span><span>¥${ok.pack.toLocaleString()}</span></div>
       ${spaceRow(ok)}
       ${extraRows(ok)}
-      <div class="month-row" style="font-weight:700"><span>奥村さん計</span><span>¥${ok.total.toLocaleString()}</span></div>
+      <div class="month-row" style="font-weight:700"><span>奥山さん計</span><span>¥${ok.total.toLocaleString()}</span></div>
       ${payRow('奥村')}
       <div style="height:1px;background:var(--gray-200);margin:10px 0"></div>
       <div style="font-size:12px;font-weight:700;color:var(--gray-400);margin-bottom:6px">相川さん</div>
@@ -1124,7 +1124,7 @@ function renderExtraChargesList() {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
       <div style="min-width:0;overflow:hidden">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">✨ ${c.label} <span style="color:var(--primary)">¥${(c.amount||0).toLocaleString()}</span></div>
-        <div style="font-size:11px;color:var(--gray-400)">${c.person}さん／${c.month}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${wName(c.person)}さん／${c.month}</div>
       </div>
       <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick="deleteExtraCharge('${c.fsId}')">削除</button>
     </div>`).join('');
@@ -1137,7 +1137,7 @@ function renderAdminSettings() {
   const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   el.innerHTML = ['奥村','相川'].map(person => `
     <div class="card">
-      <div class="card-title">${person}さんの単価</div>
+      <div class="card-title">${wName(person)}さんの単価</div>
       <div class="admin-section">
         <div class="admin-section-title">📷 撮影採寸（ジャンル別）</div>
         ${genres.map(g => `
@@ -1283,6 +1283,14 @@ function initFirestoreDrafts() {
   });
 }
 
+// 表示用の担当者名（内部値は「奥村」等のまま。画面表示だけ正しい名前に変換）
+function wName(v) {
+  if (v === '奥村' || v === 'A') return '奥山';
+  if (v === '相川' || v === 'B') return '相川';
+  if (v === 'admin') return '管理者';
+  return v || '';
+}
+
 /* ===== 下書き一覧 ===== */
 // 下書きの担当者名（依頼のassignee優先、なければ在庫の担当者）。空=自分
 function draftAssigneeName(d) {
@@ -1301,7 +1309,7 @@ function _draftCardHTML(d, pendingIds, ownerBadge) {
     <div style="padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px">
       ${(catLabel || ownerBadge) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
         ${catLabel ? `<span style="font-size:11px;font-weight:700;color:#0369A1;background:#E0F2FE;border-radius:6px;padding:1px 6px;white-space:nowrap">${catLabel}</span>` : ''}
-        ${ownerBadge ? `<span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px;white-space:nowrap">${ownerBadge}さん</span>` : ''}
+        ${ownerBadge ? `<span style="font-size:11px;font-weight:700;color:#7C3AED;background:#F3E8FF;border-radius:6px;padding:1px 6px;white-space:nowrap">${wName(ownerBadge)}さん</span>` : ''}
       </div>` : ''}
       <div>
         <div style="min-width:0">
@@ -1394,7 +1402,7 @@ function archiveDraft(id) {
   const name = draftAssigneeName(d);
   const hasOutsourcer = name === '奥村' || name === '相川';
   const msg = hasOutsourcer
-    ? `出品完了として、この下書きを一覧から片付けますか？\n（${name}さんの撮影採寸チェックも自動でONになります）`
+    ? `出品完了として、この下書きを一覧から片付けますか？\n（${wName(name)}さんの撮影採寸チェックも自動でONになります）`
     : '出品完了として、この下書きを一覧から片付けますか？\n（自分（手元）の下書きのため、外注費の計上は発生しません）';
   if (!confirm(msg)) return;
   saveDraftDoc({ ...d, archived: true, archivedAt: new Date().toISOString(), savedAt: new Date().toISOString() });
@@ -1416,7 +1424,7 @@ function autoCheckShootForDraft(draft) {
   const unitPrice = (rates[name] && rates[name].shoot && rates[name].shoot[item.genre]) || 150;
   const record = { itemId: item.id, type: 'shoot', date: new Date().toISOString().slice(0,10), unitPrice, assignee: name, createdAt: new Date().toISOString() };
   db.collection('work_records').add(record)
-    .then(() => showToast(`📷 ${name}さんの撮影採寸を記録しました`))
+    .then(() => showToast(`📷 ${wName(name)}さんの撮影採寸を記録しました`))
     .catch(e => console.error('撮影採寸の自動記録エラー:', e));
 }
 
