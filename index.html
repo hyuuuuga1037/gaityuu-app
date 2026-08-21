@@ -818,6 +818,18 @@ async function undoPack(itemId) {
   } catch(err) { showToast('❌ 失敗しました'); }
 }
 
+// ▼ 発送通知（ntfy）：外注さんが梱包発送チェックした瞬間、管理者のスマホにプッシュ通知を飛ばす。
+//   スマホのntfyアプリで、下のトピック名を購読しておくこと（合言葉なので他人に教えない）。
+const NTFY_TOPIC = 'hinata-hassou-7k2p9x4m';
+function notifyShipment(item) {
+  try {
+    fetch('https://ntfy.sh/' + NTFY_TOPIC, {
+      method: 'POST',
+      body: `📦 ${wName(currentUser)}さんが梱包発送しました\nNo.${item.no||'-'} ${item.brand||''}${item.details?' / '+item.details:''}\n→ 購入者へ発送通知をお願いします`
+    }).catch(() => {}); // 通知が失敗してもチェック操作は妨げない
+  } catch (e) {}
+}
+
 async function toggleWork(e, itemId, type, isDone) {
   e.preventDefault();
   const item = _inventory.find(i => i.id === itemId);
@@ -844,6 +856,8 @@ async function toggleWork(e, itemId, type, isDone) {
     try {
       await db.collection('work_records').add(record);
       showToast('✅ 作業を記録しました');
+      // 梱包発送を外注さんがチェックしたら、管理者のスマホへ通知（LINE連絡を不要に）
+      if (type === 'pack' && currentUser !== 'admin') notifyShipment(item);
     } catch(err) { showToast('❌ 失敗しました'); }
   }
 }
