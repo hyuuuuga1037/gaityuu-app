@@ -830,6 +830,16 @@ function notifyShipment(item) {
   } catch (e) {}
 }
 
+// ▼ 撮影採寸通知（ntfy）：外注さんが撮影採寸チェックした瞬間、管理者のスマホにプッシュ通知を飛ばす。
+function notifyShoot(item) {
+  try {
+    fetch('https://ntfy.sh/' + NTFY_TOPIC, {
+      method: 'POST',
+      body: `📷 ${wName(currentUser)}さんが撮影採寸しました\nNo.${item.no||'-'} ${item.brand||''}${item.details?' / '+item.details:''}\n→ 出品作業をお願いします`
+    }).catch(() => {}); // 通知が失敗してもチェック操作は妨げない
+  } catch (e) {}
+}
+
 async function toggleWork(e, itemId, type, isDone) {
   e.preventDefault();
   const item = _inventory.find(i => i.id === itemId);
@@ -858,6 +868,8 @@ async function toggleWork(e, itemId, type, isDone) {
       showToast('✅ 作業を記録しました');
       // 梱包発送を外注さんがチェックしたら、管理者のスマホへ通知（LINE連絡を不要に）
       if (type === 'pack' && currentUser !== 'admin') notifyShipment(item);
+      // 撮影採寸を外注さんがチェックしたら、管理者のスマホへ通知
+      if (type === 'shoot' && currentUser !== 'admin') notifyShoot(item);
     } catch(err) { showToast('❌ 失敗しました'); }
   }
 }
