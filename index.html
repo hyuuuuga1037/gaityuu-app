@@ -911,7 +911,7 @@ function openMeasureForItem(itemId) {
   if (nameEl) { nameEl.value = item.brand||''; document.getElementById('name-cnt').textContent=(item.brand||'').length+'/40'; }
 
   // ジャンル→カテゴリ自動選択（採寸エリアは再描画され、数値・選択とも白紙になる）
-  const genreMap = { 'スーツ':'suit','靴':'shoes','バッグ':'bag','ジャージ':'jersey','洋服':'tops','デニム':'pants','その他':'tops' };
+  const genreMap = { 'スーツ':'suit','靴':'shoes','バッグ':'bag','ジャージ':'jersey','洋服':'tops','デニム':'pants','アウター':'outer','その他':'tops' };
   const catId = genreMap[item.genre] || '';
   if (catId) selectCat(catId);
 
