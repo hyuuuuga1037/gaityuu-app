@@ -626,7 +626,7 @@ function initData() {
 }
 
 function defaultRates() {
-  const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const genres = ['スーツ','レディーススーツ','洋服','アウター','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   const shoot = {};
   genres.forEach(g => shoot[g] = (g === 'スーツ' || g === 'レディーススーツ') ? 200 : g === 'アクセサリー' ? 100 : 150);
   return {
@@ -1160,7 +1160,7 @@ function renderExtraChargesList() {
 function renderAdminSettings() {
   const el = document.getElementById('admin-settings-content');
   const rates = _rates || defaultRates();
-  const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const genres = ['スーツ','レディーススーツ','洋服','アウター','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   el.innerHTML = ['奥村','相川'].map(person => `
     <div class="card">
       <div class="card-title">${wName(person)}さんの単価</div>
@@ -1206,7 +1206,7 @@ function renderAdminSettings() {
 }
 
 async function saveRates() {
-  const genres = ['スーツ','レディーススーツ','洋服','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
+  const genres = ['スーツ','レディーススーツ','洋服','アウター','デニム','ジャージ','靴','バッグ','アクセサリー','その他'];
   const newRates = {};
   ['奥村','相川'].forEach(person => {
     newRates[person] = { shoot:{}, pack:0 };
@@ -1324,7 +1324,7 @@ function draftAssigneeName(d) {
   return (a === 'A') ? '奥村' : (a === 'B') ? '相川' : a;
 }
 // 下書きのカテゴリ表示ラベル（例:「スーツ」「レディーススーツ」「バッグ」）
-const DRAFT_CAT_LABELS = { bag:'バッグ', tops:'洋服', pants:'デニム', shoes:'靴', jersey:'ジャージ' };
+const DRAFT_CAT_LABELS = { bag:'バッグ', outer:'アウター', one:'ワンピース', skirt:'スカート', tops:'洋服', pants:'デニム', shoes:'靴', jersey:'ジャージ' };
 function draftCatLabel(d) {
   if (d.cat === 'suit') return d.suitStyle === 'ladies' ? 'レディーススーツ' : 'スーツ';
   return DRAFT_CAT_LABELS[d.cat] || '';
