@@ -1870,11 +1870,23 @@ function setSuitType(v){
   if(jSec) jSec.style.display=(v==='pants_only')?'none':'block';
   if(pSec) pSec.style.display=(v==='jacket')?'none':'block';
 }
+function updateHemExtraState(){
+  var inp=document.getElementById('sp-hemextra'); if(!inp) return;
+  var na=(hemType==='double')||(suitStyle==='ladies');
+  if(na){
+    inp.value=''; inp.disabled=true; inp.placeholder='計測不要';
+    inp.style.background='var(--gray-100)'; inp.style.color='var(--gray-400)';
+  }else{
+    inp.disabled=false; inp.placeholder='0.0';
+    inp.style.background=''; inp.style.color='';
+  }
+}
 function setHemType(v){
   hemType=v;
   document.querySelectorAll('#hem-type-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   const row=document.getElementById('hem-fold-row');
   if(row) row.style.display=(v==='double')?'flex':'none';
+  updateHemExtraState();
 }
 function setSuitThreePiece(){
   suitThreePiece=!suitThreePiece;
@@ -1926,6 +1938,7 @@ function setSuitStyle(v){
   if(v==='ladies'){ if(lbl) lbl.textContent='3点セット'; if(btn) btn.textContent='3点（スカート付き）'; }
   else { if(lbl) lbl.textContent='スリーピース'; if(btn) btn.textContent='3ピース（ベスト付き）'; }
   updateThreePieceSections();
+  updateHemExtraState();
 }
 function renderShoesMeasures(area){
   area.innerHTML=`
@@ -1980,6 +1993,7 @@ function toggleSuitOption(el){
   if(val==='アジャスター'){
     const on=suitDesign.options.includes('アジャスター');
     const row=document.getElementById('sp-waist-max-row'); if(row) row.style.display=on?'flex':'none';
+    if(on && row){ row.scrollIntoView({behavior:'smooth',block:'center'}); var w=document.getElementById('sp-waist-max'); if(w) setTimeout(function(){ w.focus(); }, 350); }
   }
 }
 function buildSuitDesignLines(){
