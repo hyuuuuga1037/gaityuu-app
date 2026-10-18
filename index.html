@@ -702,6 +702,7 @@ function myItems() {
     .filter(i => {
       if (!_assignedToMe(i)) return false;
       if (_packedByMe(i.id)) return false; // 発送済みは通常リストから外す
+      if (i.platform === '廃棄') return false; // 廃棄（損切り）は発送不要なので出さない
       if (_itemShipOnly && i.status !== 'sold') return false; // 「要発送のみ」絞り込み
       // 売却済みは「最近売れて、まだ発送チェックしていないもの」だけ残す
       if (i.status === 'sold') {
