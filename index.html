@@ -223,6 +223,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .selected-banner .banner-clear{background:rgba(255,255,255,.25);border:none;color:white;
   padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit}
 </style>
+<style>/* 数値欄の上下矢印を出さない（直接入力のみ） */input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}</style>
 </head>
 <body>
 
@@ -779,6 +780,13 @@ function renderItems() {
   }).join('');
 }
 
+// 在庫の作業メモの表示部品（担当商品・下書き一覧・採寸画面で共通）
+function workerNoteBoxHTML(itemId, note) {
+  return note
+    ? `<div onclick="editWorkerNote(${itemId})" style="cursor:pointer;margin-top:8px;padding:8px 10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;font-size:13px;color:#92400E;white-space:pre-wrap">📝 指示：${note}　<span style="font-size:11px;color:#B45309">（タップで編集）</span></div>`
+    : `<button onclick="editWorkerNote(${itemId})" style="margin-top:8px;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 メモを追加</button>`;
+}
+
 // 商品へのメモ（指示）を入力・編集。在庫データに保存（在庫アプリと共有）。
 function editWorkerNote(itemId) {
   const item = _inventory.find(i => i.id === itemId);
@@ -926,14 +934,18 @@ function openMeasureForItem(itemId) {
 function renderSelectedBanner() {
   const el = document.getElementById('selected-item-banner');
   if (!el) return;
-  if (!_selectedItemId) { el.innerHTML = ''; return; }
+  // 作業メモ：選択中の商品、または開いている下書き（＝同じ商品ID）の在庫メモを表示
+  const memoId = _selectedItemId || _currentDraftId;
+  const mItem = memoId ? _inventory.find(i => i.id === memoId) : null;
+  const memoHtml = mItem ? workerNoteBoxHTML(mItem.id, mItem.workerNote) : '';
+  if (!_selectedItemId) { el.innerHTML = memoHtml; return; }
   const item = _inventory.find(i => i.id === _selectedItemId);
-  if (!item) { el.innerHTML = ''; return; }
+  if (!item) { el.innerHTML = memoHtml; return; }
   el.innerHTML = `
     <div class="selected-banner">
       <div class="banner-info">No.${item.no} ${item.brand||'-'} ${item.genre||''}</div>
       <button class="banner-clear" onclick="clearSelectedItem()">✕ 解除</button>
-    </div>`;
+    </div>` + memoHtml;
 }
 
 function clearSelectedItem() {
@@ -1257,7 +1269,7 @@ const MEASURES = {
   bag:  [{k:'縦',u:'cm',req:true},{k:'横（上部）',u:'cm',req:true},{k:'横（下部）',u:'cm',req:true},{k:'マチ',u:'cm',req:true},{k:'持ち手の長さ',u:'cm',req:false},{k:'ショルダー紐',u:'cm',req:false}],
   tops: [{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:true},{k:'着丈',u:'cm',req:true}],
   one:  [{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:false},{k:'着丈',u:'cm',req:true},{k:'スカート丈',u:'cm',req:false}],
-  pants:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'股上',u:'cm',req:true},{k:'股下',u:'cm',req:true},{k:'わたり幅',u:'cm',req:false},{k:'裾幅',u:'cm',req:false}],
+  pants:[{k:'ウエスト',u:'cm',req:true},{k:'総丈',u:'cm',req:true},{k:'わたり幅',u:'cm',req:true},{k:'股下',u:'cm',req:true},{k:'裾幅',u:'cm',req:true},{k:'裾余り',u:'cm',req:true}], // スーツのパンツ採寸と同じ項目
   skirt:[{k:'ウエスト',u:'cm',req:true},{k:'ヒップ',u:'cm',req:false},{k:'丈',u:'cm',req:true},{k:'裾幅',u:'cm',req:false}],
   outer:[{k:'肩幅',u:'cm',req:true},{k:'身幅',u:'cm',req:true},{k:'袖丈',u:'cm',req:true},{k:'着丈',u:'cm',req:true}],
   shoes:'special_shoes',
@@ -1349,9 +1361,15 @@ function _draftCardHTML(d, pendingIds, ownerBadge) {
           ${currentUser === 'admin' ? `<button class="btn btn-outline btn-sm" onclick="deleteDraftConfirm(${d.id})">削除</button>` : ''}
         </div>
       </div>
-      ${d.memo
-        ? `<div onclick="editDraftMemo(${d.id})" style="cursor:pointer;margin-top:8px;padding:7px 9px;background:#EFF6FF;border:1px solid #3B82F6;border-radius:8px;font-size:12px;color:#1E40AF;white-space:pre-wrap">📝 ${d.memo}　<span style="font-size:10px;color:#3B82F6">（タップで編集）</span></div>`
-        : `<button onclick="editDraftMemo(${d.id})" style="margin-top:8px;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 作業メモを追加</button>`}
+      ${(() => {
+        // 在庫の作業メモ（在庫アプリ・担当商品と共通の1つのメモ）を表示・編集
+        const it = _inventory.find(i => i.id === d.id);
+        let h = it ? workerNoteBoxHTML(it.id, it.workerNote) : '';
+        // 以前の下書き専用メモが残っている場合は消さずに表示（新規はすべて在庫のメモに書く）
+        if (d.memo) h += `<div onclick="editDraftMemo(${d.id})" style="cursor:pointer;margin-top:6px;padding:7px 9px;background:#EFF6FF;border:1px solid #3B82F6;border-radius:8px;font-size:12px;color:#1E40AF;white-space:pre-wrap">📝 ${d.memo}　<span style="font-size:10px;color:#3B82F6">（以前の下書きメモ・タップで編集）</span></div>`;
+        else if (!it) h += `<button onclick="editDraftMemo(${d.id})" style="margin-top:8px;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:1px dashed var(--gray-300);background:#fff;color:var(--gray-500)">📝 作業メモを追加</button>`;
+        return h;
+      })()}
     </div>`;
 }
 
@@ -1583,6 +1601,7 @@ function loadDraftIntoForm(id) {
       const el = document.getElementById(kDash) || document.getElementById('m-' + kDash);
       if (el && m[k]) el.value = m[k];
     });
+    if (selCat === 'pants') { setPantsAdj(!!m.pantsAdj, true); setPantsHem(m.pantsHemType || 'single'); if (m.pantsHemType !== 'double' && m['裾余り']) { const el = document.getElementById('m-裾余り'); if (el) el.value = m['裾余り']; } }
     // スーツのフォーム状態を復元（種類・種別・裾・3点・デザイン選択・色柄）
     if (selCat === 'suit') {
       // 3ピース/下衣種別は selectCat→renderSuitMeasures でリセットされるため、ここで下書きから再適用する
@@ -1749,7 +1768,39 @@ function renderMeasures(){
     <div class="mr">
       <div class="ml">${m.k}<small>${m.req?'':'任意'}</small></div>
       <div class="mw"><input type="number" id="m-${m.k}" placeholder="0.0" step="0.5" min="0"><span class="mu">${m.u}</span></div>
-    </div>`).join('');
+    </div>`+(selCat==='pants'&&m.k==='ウエスト'?`
+    <div class="mr" id="p-waist-max-row" style="display:none"><div class="ml">ウエスト最大<small>アジャスター</small></div><div class="mw"><input type="number" id="m-ウエスト最大" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>`:'')).join('')
+    +(selCat==='pants'?`
+    <div class="fg" style="margin-top:10px"><div class="fl">オプション</div>
+      <div class="rg"><div class="rb" id="p-adj-btn" onclick="setPantsAdj(!pantsAdj)">アジャスター</div></div>
+    </div>
+    <div class="fg" style="margin-top:10px"><div class="fl">裾仕様</div>
+      <div class="rg" id="p-hem-rg">
+        <div class="rb on" data-v="single" onclick="setPantsHem('single')">シングル</div>
+        <div class="rb" data-v="double" onclick="setPantsHem('double')">ダブル</div>
+      </div>
+    </div>
+    <div class="mr" id="p-fold-row" style="display:none;margin-top:4px"><div class="ml">折り返し幅</div><div class="mw"><input type="number" id="m-折り返し幅" placeholder="0.0" step="0.5" min="0"><span class="mu">cm</span></div></div>`:'');
+  if(selCat==='pants'){ setPantsAdj(false, true); setPantsHem('single'); }
+}
+// パンツ（カテゴリ）の裾仕様・アジャスター（スーツのパンツ採寸と同じ扱い）
+var pantsHemType='single', pantsAdj=false;
+function setPantsHem(v){
+  pantsHemType=v;
+  document.querySelectorAll('#p-hem-rg .rb').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  const row=document.getElementById('p-fold-row'); if(row) row.style.display=(v==='double')?'flex':'none';
+  // ダブルは裾余りが出ないので計測不要
+  const inp=document.getElementById('m-裾余り');
+  if(inp){
+    if(v==='double'){ inp.value=''; inp.disabled=true; inp.placeholder='計測不要'; inp.style.background='var(--gray-100)'; inp.style.color='var(--gray-400)'; }
+    else { inp.disabled=false; inp.placeholder='0.0'; inp.style.background=''; inp.style.color=''; }
+  }
+}
+function setPantsAdj(on, noScroll){
+  pantsAdj=!!on;
+  const btn=document.getElementById('p-adj-btn'); if(btn) btn.classList.toggle('on',pantsAdj);
+  const row=document.getElementById('p-waist-max-row'); if(row) row.style.display=pantsAdj?'flex':'none';
+  if(pantsAdj&&row&&!noScroll){ row.scrollIntoView({behavior:'smooth',block:'center'}); const w=document.getElementById('m-ウエスト最大'); if(w) setTimeout(()=>w.focus(),350); }
 }
 
 function renderSuitMeasures(area){
@@ -2201,7 +2252,17 @@ function generateText(){
     lines = buildShoesText(brand, mgmt);
   } else if(schema&&schema!=='special'&&schema!=='special_jersey'&&schema!=='special_shoes'&&selCat){
     lines.push('■ 採寸データ（平置き実寸）');
-    schema.forEach(ms=>{ const val=fm('m-'+ms.k); if(val>0) lines.push(`${ms.k}：${val}cm`); });
+    schema.forEach(ms=>{
+      if(selCat==='pants'){
+        if(ms.k==='ウエスト'&&pantsAdj){ const mn=fm('m-ウエスト'),mx=fm('m-ウエスト最大'); if(mn>0&&mx>0){ lines.push(`ウエスト：${mn}〜${mx}cm(アジャスター付き)`); return; } }
+        if(ms.k==='裾余り') return; // 裾余りは下の裾仕様の文にまとめる（スーツと同じ）
+      }
+      const val=fm('m-'+ms.k); if(val>0) lines.push(`${ms.k}：${val}cm`);
+    });
+    if(selCat==='pants'){
+      lines.push(pantsHemType==='double'?('裾ダブル仕上げ'+(fm('m-折り返し幅')>0?'（折り返し'+fcm('m-折り返し幅')+'）':'')):'裾シングル仕上げ');
+      if(pantsHemType!=='double'&&fm('m-裾余り')>0){ lines.push(''); lines.push('裾折り返し'+fm('m-裾余り')+'cmほどあるので、'); lines.push('お直しで少し伸ばせます。'); }
+    }
     lines.push('');
   } else if(selCat==='suit'){
     lines = buildSuitText(brand, size, mgmt);
@@ -2288,6 +2349,7 @@ function collectMeasures(){
   }
   const obj={};
   schema.forEach(ms=>{ obj[ms.k]=fm('m-'+ms.k); });
+  if(selCat==='pants'){ obj['ウエスト最大']=fm('m-ウエスト最大'); obj['折り返し幅']=fm('m-折り返し幅'); obj.pantsHemType=pantsHemType; obj.pantsAdj=pantsAdj; }
   return obj;
 }
 
@@ -2331,6 +2393,13 @@ function showToast(msg){
   t.textContent=msg;t.classList.add('on');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2400);
 }
+</script>
+<script>
+// 数値欄の上でマウスホイールを回しても値が変わらないようにする（スクロールの拍子に価格・採寸値がずれるのを防ぐ）
+document.addEventListener('wheel', function(e) {
+  var el = document.activeElement;
+  if (el && el.type === 'number' && el === e.target) el.blur();
+}, { passive: true });
 </script>
 </body>
 </html>
