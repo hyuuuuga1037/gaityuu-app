@@ -2209,7 +2209,8 @@ function buildSuitText(brand,size,mgmt){
   } else {
     push('・24時間以内発送','・匿名配送','');
     push('■その他同サイズスーツ','#ひなたスーツ','');
-    if(tp) push('■その他同スリーピーススーツ','#ひなたスリーピーススーツ','');
+    if(suitStyle==='travel') push('■その他イージースーツ','#ひなたトラベルスーツ','');
+    else if(tp) push('■その他同スリーピーススーツ','#ひなたスリーピーススーツ','');
   }
   push('■ブランド'); if(brand) push(brand); push('');
   if(suitStyle==='business'||suitStyle==='travel'){
