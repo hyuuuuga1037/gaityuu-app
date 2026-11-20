@@ -988,7 +988,8 @@ function renderSummary() {
     const packTotal  = packRecs.reduce((s,r)  => s+(r.unitPrice||0), 0);
     const extras = extraChargesFor(currentUser, month);
     const extraTotal = extras.reduce((s,c) => s+(c.amount||0), 0);
-    const grandTotal = shootTotal + packTotal + (spaceEnabled ? spaceAmount : 0) + extraTotal;
+    const spOn = spaceActive(userRates, month);
+    const grandTotal = shootTotal + packTotal + (spOn ? spaceAmount : 0) + extraTotal;
     const [y,m] = month.split('-');
 
     const detailRows = recs.slice().sort((a,b) => (a.date < b.date ? 1 : -1)).map(r => {
@@ -1005,7 +1006,7 @@ function renderSummary() {
       <div class="month-title">${y}年${parseInt(m)}月</div>
       <div class="month-row"><span>📷 撮影採寸（${shootRecs.length}件）</span><span>¥${shootTotal.toLocaleString()}</span></div>
       <div class="month-row"><span>📦 梱包発送（${packRecs.length}件）</span><span>¥${packTotal.toLocaleString()}</span></div>
-      ${spaceEnabled ? `<div class="month-row"><span>🏠 場所代</span><span>¥${spaceAmount.toLocaleString()}</span></div>` : ''}
+      ${spOn ? `<div class="month-row"><span>🏠 場所代</span><span>¥${spaceAmount.toLocaleString()}</span></div>` : ''}
       ${extras.map(c => `<div class="month-row"><span>✨ ${c.label}</span><span>¥${(c.amount||0).toLocaleString()}</span></div>`).join('')}
       <div class="month-row total"><span>合計</span><span>¥${grandTotal.toLocaleString()}</span></div>
       ${(() => { const paid = getPaidDate(month, currentUser);
@@ -1082,10 +1083,10 @@ function renderAdminSummary() {
       const shoot = pr.filter(r=>r.type==='shoot').reduce((s,r)=>s+(r.unitPrice||0),0);
       const pack  = pr.filter(r=>r.type==='pack' ).reduce((s,r)=>s+(r.unitPrice||0),0);
       const ur = rates[name] || {};
-      const space = ur.spaceEnabled ? (ur.spaceAmount || 0) : 0;
+      const space = spaceActive(ur, month) ? (ur.spaceAmount || 0) : 0;
       const extras = extraChargesFor(name, month);
       const extraTotal = extras.reduce((s,c)=>s+(c.amount||0),0);
-      return { shoot, pack, space, spaceEnabled: !!ur.spaceEnabled, extras, extraTotal,
+      return { shoot, pack, space, spaceEnabled: spaceActive(ur, month), extras, extraTotal,
         total: shoot+pack+space+extraTotal,
         shootCnt: pr.filter(r=>r.type==='shoot').length,
         packCnt:  pr.filter(r=>r.type==='pack').length };
@@ -1169,6 +1170,11 @@ function renderExtraChargesList() {
     </div>`).join('');
 }
 
+// 場所代をその月に計上するか（有効＋最終月以前。最終月が空欄ならずっと）
+function spaceActive(ur, month) {
+  return !!(ur && ur.spaceEnabled && (!ur.spaceUntil || month <= ur.spaceUntil));
+}
+
 /* ===== 管理者：単価設定 ===== */
 function renderAdminSettings() {
   const el = document.getElementById('admin-settings-content');
@@ -1213,6 +1219,10 @@ function renderAdminSettings() {
             <input type="number" id="rate-${person}-space-amount" value="${rates[person]?.spaceAmount??0}" min="0" step="100">
           </div>
         </div>
+        <div class="rate-row">
+          <span>最終月<small style="display:block;font-size:11px;color:var(--gray-400)">この月まで計上（空欄＝ずっと）</small></span>
+          <input type="month" id="rate-${person}-space-until" value="${rates[person]?.spaceUntil||''}" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px">
+        </div>
       </div>
     </div>`).join('') +
     `<button class="btn btn-primary btn-full" onclick="saveRates()">💾 単価を保存する</button>`;
@@ -1229,6 +1239,7 @@ async function saveRates() {
     newRates[person].pack = parseInt(document.getElementById(`rate-${person}-pack`)?.value)||0;
     newRates[person].spaceEnabled = document.getElementById(`rate-${person}-space-enabled`)?.checked || false;
     newRates[person].spaceAmount  = parseInt(document.getElementById(`rate-${person}-space-amount`)?.value)||0;
+    newRates[person].spaceUntil   = document.getElementById(`rate-${person}-space-until`)?.value || '';
   });
   try {
     await db.collection('settings').doc('rates').set(newRates);
@@ -1808,6 +1819,7 @@ function renderSuitMeasures(area){
     <div class="fg"><div class="fl">スーツの種類</div>
       <div class="rg" id="suit-style-rg" style="flex-wrap:wrap">
         <div class="rb on" data-v="business" onclick="setSuitStyle('business')">ビジネス</div>
+        <div class="rb" data-v="travel" onclick="setSuitStyle('travel')">トラベル</div>
         <div class="rb" data-v="formal" onclick="setSuitStyle('formal')">礼服</div>
         <div class="rb" data-v="vintage" onclick="setSuitStyle('vintage')">ヴィンテージ</div>
         <div class="rb" data-v="ladies" onclick="setSuitStyle('ladies')">レディース</div>
@@ -1891,6 +1903,7 @@ function renderSuitMeasures(area){
       <div class="fg"><div class="fl">ベント</div><div class="rg">
         <div class="rb" data-g="vent" data-v="センターベント" onclick="setSuitDesignRadio('vent','センターベント')">センターベント</div>
         <div class="rb" data-g="vent" data-v="サイドベンツ" onclick="setSuitDesignRadio('vent','サイドベンツ')">サイドベンツ</div>
+        <div class="rb" data-g="vent" data-v="ノーベント" onclick="setSuitDesignRadio('vent','ノーベント')">ノーベント</div>
       </div></div>
       <div class="fg"><div class="fl">オプション <span class="opt">複数選択可</span></div>
         <div class="rg" id="suit-options-rg" style="flex-wrap:wrap;white-space:nowrap">
@@ -1903,6 +1916,7 @@ function renderSuitMeasures(area){
           <div class="rb" data-v="ノーカラー" onclick="toggleSuitOption(this)">ノーカラー</div>
           <div class="rb" data-v="アジャスター" onclick="toggleSuitOption(this)">アジャスター</div>
           <div class="rb" data-v="ネーム刺繍" onclick="toggleSuitOption(this)">ネーム刺繍</div>
+          <div class="rb" data-v="お台場" onclick="toggleSuitOption(this)">お台場</div>
         </div>
       </div>
       <div class="fg"><div class="fl">色・柄 <span class="opt">任意</span></div>
@@ -2083,6 +2097,7 @@ function suitOptionLines(){
     if(o==='ノーカラー'){ out.push('ノーカラージャケット'); out.push('カラーレスジャケット'); }
     else if(o==='アジャスター'){ out.push('ウエストアジャスター'); out.push('ウエスト調整'); }
     else if(o==='ストレッチ'){ out.push('ストレッチ 伸縮性'); }
+    else if(o==='お台場'){ out.push('お台場仕立て（高級スーツ仕様）'); }
     else if(o==='ウォッシャブル'){ out.push('ウォッシャブル 洗える 洗濯可'); }
     else out.push(o);
   });
@@ -2197,7 +2212,7 @@ function buildSuitText(brand,size,mgmt){
     if(tp) push('■その他同スリーピーススーツ','#ひなたスリーピーススーツ','');
   }
   push('■ブランド'); if(brand) push(brand); push('');
-  if(suitStyle==='business'){
+  if(suitStyle==='business'||suitStyle==='travel'){
     push('ビジネススーツ'); if(suitType==='setup') push('セットアップ'); if(stComp) push(stComp);
     push('');
   }
