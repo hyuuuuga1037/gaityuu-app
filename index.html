@@ -2106,6 +2106,7 @@ function suitOptionLines(){
 function colorPatternLines(){ return (fv('suit-design-memo')||'').split('\n').map(s=>s.trim()).filter(Boolean); }
 function suitDesignBlock(){
   const parts=[];
+  if(suitStyle==='formal') parts.push('黒 ブラック 無地');
   colorPatternLines().forEach(l=>parts.push(l));
   if(suitDesign.lining) parts.push(suitDesign.lining);
   if(suitButtonText()) parts.push(suitButtonText());
